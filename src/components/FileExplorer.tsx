@@ -136,13 +136,16 @@ export const FileExplorer = () => {
     };
 
     React.useEffect(() => {
-        // Initial load? Maybe get home dir via command?
-        // For now try C:\ or / on Mac
-        // We should detect OS or use home dir.
-        // Let's rely on user navigation or hardcode a sensible default based on OS if possible.
-        // Or add a 'get_home' command.
-        // For now, default to root.
-        fetchData('/'); // Mac/Linux root. Windows user might need C:
+        const initialPath = '/'; // Default start path
+        // Reset history to just this path
+        setState(prev => ({
+            ...prev,
+            history: [initialPath],
+            historyIndex: 0,
+            path: initialPath,
+            loading: true // Show loading initially
+        }));
+        fetchData(initialPath);
     }, []);
 
     const handleNavigate = (newPath: string) => {
@@ -181,14 +184,11 @@ export const FileExplorer = () => {
 
     const handleUp = () => {
         // Basic navigation up logic
-        // Needs platform specific separator handling ideally
         const separator = state.path.includes('/') ? '/' : '\\';
         const parts = state.path.split(separator).filter(Boolean);
         if (parts.length > 0) {
             parts.pop();
             const parentPath = parts.length === 0 ? '/' : parts.join(separator);
-            // Fix for windows drive letter C: -> C:\?
-            // Fix for unix root /
             const finalPath = parentPath === '' ? '/' : (state.path.startsWith('/') ? '/' + parentPath : parentPath);
             handleNavigate(finalPath);
         }
@@ -246,22 +246,27 @@ export const FileExplorer = () => {
                                 onDoubleClick={() => {
                                     if (item.is_dir) handleNavigate(item.path);
                                 }}
+                                onKeyDown={(e: React.KeyboardEvent) => {
+                                    if ((e.key === 'Enter' || e.key === 'ArrowRight') && item.is_dir) {
+                                        handleNavigate(item.path);
+                                    }
+                                }}
                             >
                                 {({ renderCell }) => (
                                     <DataGridCell>{renderCell(item)}</DataGridCell>
                                 )}
                             </DataGridRow>
                         )}
-                    </DataGridBody>
-                </DataGrid>
-            </div>
+                    </DataGridBody >
+                </DataGrid >
+            </div >
 
             {/* Status Bar */}
-            <div className={styles.statusBar}>
+            < div className={styles.statusBar} >
                 <Text>{items.length} items</Text>
                 <Text>Total Size: {formatSize(state.data?.size || 0)}</Text>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 
