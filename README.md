@@ -1,6 +1,6 @@
-# Helium v3 (Tauri Rewrite)
+# Helium v3 (Tauri Application)
 
-This is a modern rewrite of the Helium storage analyzer tool, built with:
+A modern storage analyzer tool built with:
 - **Tauri** (Rust) for the backend
 - **Next.js** (React) for the frontend
 - **Fluent UI 2** for the design system

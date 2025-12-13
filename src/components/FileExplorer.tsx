@@ -38,6 +38,7 @@ import {
     HomeRegular,
     HardDriveRegular,
     DataPieRegular,
+    InfoRegular,
 } from '@fluentui/react-icons';
 import { DiskUsageChart } from './DiskUsageChart';
 import { invoke } from '@tauri-apps/api/core';
@@ -279,6 +280,12 @@ export const FileExplorer = () => {
         }
     };
 
+    // Show basic properties of a file/folder in an alert dialog
+    const handleProperties = (item: FileNode) => {
+        const details = `Name: ${item.name}\nSize: ${formatSize(item.size)}\nModified: ${new Date(item.last_modified * 1000).toLocaleString()}`;
+        alert(details);
+    };
+
     const items = state.data?.children || [];
 
     return (
@@ -405,6 +412,9 @@ export const FileExplorer = () => {
                                 </MenuItem>
                                 <MenuItem icon={<FolderOpenRegular />} onClick={() => contextMenuItem && handleOpenInExplorer(contextMenuItem)}>
                                     Reveal in Explorer/Finder
+                                </MenuItem>
+                                <MenuItem icon={<InfoRegular />} onClick={() => contextMenuItem && handleProperties(contextMenuItem)} disabled={!contextMenuItem}>
+                                    Properties
                                 </MenuItem>
                                 <MenuItem icon={<DeleteRegular />} onClick={() => contextMenuItem && handleDelete(contextMenuItem)}>
                                     Delete
