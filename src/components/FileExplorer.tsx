@@ -17,11 +17,8 @@ import {
     TableColumnDefinition,
     createTableColumn,
     ProgressBar,
-    Breadcrumb,
-    BreadcrumbItem,
-    BreadcrumbDivider,
-    BreadcrumbButton,
-    Avatar,
+    Tooltip,
+    SelectionItemId,
 } from '@fluentui/react-components';
 import {
     FolderRegular,
@@ -29,9 +26,8 @@ import {
     ArrowUpRegular,
     ArrowLeftRegular,
     ArrowRightRegular,
-    HomeRegular,
     ArrowClockwiseRegular,
-    DesktopRegular
+    OpenRegular,
 } from '@fluentui/react-icons';
 import { invoke } from '@tauri-apps/api/core';
 import { FileNode } from '@/types';
@@ -58,7 +54,7 @@ const useStyles = makeStyles({
     gridContainer: {
         flexGrow: 1,
         overflowY: 'auto',
-        ...shorthands.border('1px', 'solid', '#333'), // discrete border
+        ...shorthands.border('1px', 'solid', '#333'),
         ...shorthands.borderRadius('4px'),
     },
     statusBar: {
@@ -81,7 +77,7 @@ interface ExplorerState {
 export const FileExplorer = () => {
     const styles = useStyles();
     const [state, setState] = React.useState<ExplorerState>({
-        path: 'C:\\', // Default, will be updated on mount probably
+        path: 'C:\\',
         loading: false,
         data: null,
         history: ['C:\\'],
@@ -90,8 +86,24 @@ export const FileExplorer = () => {
     });
 
     const [inputPath, setInputPath] = React.useState(state.path);
+    const [selectedItems, setSelectedItems] = React.useState<Set<SelectionItemId>>(new Set());
 
-    // Columns definition
+    // Compute the actually selected item object (only one supported for now)
+    const selectedItem = React.useMemo(() => {
+        if (selectedItems.size === 0) return null;
+        const id = Array.from(selectedItems)[0];
+        // We use path as ID
+        return state.data?.children?.find(c => c.path === id) || null;
+    }, [selectedItems, state.data]);
+
+    const formatSize = (bytes: number): string => {
+        if (bytes === 0) return '0 B';
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    };
+
     const columns: TableColumnDefinition<FileNode>[] = [
         createTableColumn({
             columnId: 'file',
@@ -130,20 +142,20 @@ export const FileExplorer = () => {
             const data = await invoke<FileNode>(command, { path });
             setState(prev => ({ ...prev, loading: false, data, path }));
             setInputPath(path);
+            setSelectedItems(new Set()); // Clear selection on navigate
         } catch (e: any) {
             setState(prev => ({ ...prev, loading: false, error: String(e) }));
         }
     };
 
     React.useEffect(() => {
-        const initialPath = '/'; // Default start path
-        // Reset history to just this path
+        const initialPath = '/';
         setState(prev => ({
             ...prev,
             history: [initialPath],
             historyIndex: 0,
             path: initialPath,
-            loading: true // Show loading initially
+            loading: true
         }));
         fetchData(initialPath);
     }, []);
@@ -151,7 +163,6 @@ export const FileExplorer = () => {
     const handleNavigate = (newPath: string) => {
         if (newPath === state.path) return;
 
-        // Add to history
         const newHistory = state.history.slice(0, state.historyIndex + 1);
         newHistory.push(newPath);
 
@@ -182,9 +193,14 @@ export const FileExplorer = () => {
         }
     };
 
+    // Up one level logic
     const handleUp = () => {
-        // Basic navigation up logic
-        const separator = state.path.includes('/') ? '/' : '\\';
+        let separator = '/';
+        if (state.path.includes('\\')) separator = '\\';
+
+        // Handle root cases primarily for UNIX
+        if (state.path === '/' || state.path === '\\') return;
+
         const parts = state.path.split(separator).filter(Boolean);
         if (parts.length > 0) {
             parts.pop();
@@ -200,10 +216,26 @@ export const FileExplorer = () => {
         <div className={styles.container}>
             {/* Toolbar */}
             <div className={styles.toolbar}>
-                <Button icon={<ArrowLeftRegular />} disabled={state.historyIndex <= 0} onClick={handleBack} />
-                <Button icon={<ArrowRightRegular />} disabled={state.historyIndex >= state.history.length - 1} onClick={handleForward} />
-                <Button icon={<ArrowUpRegular />} onClick={handleUp} />
-                <Button icon={<ArrowClockwiseRegular />} onClick={() => fetchData(state.path, true)} />
+                <Tooltip content="Back" relationship="label">
+                    <Button icon={<ArrowLeftRegular />} disabled={state.historyIndex <= 0} onClick={handleBack} />
+                </Tooltip>
+                <Tooltip content="Forward" relationship="label">
+                    <Button icon={<ArrowRightRegular />} disabled={state.historyIndex >= state.history.length - 1} onClick={handleForward} />
+                </Tooltip>
+                <Tooltip content="Up" relationship="label">
+                    <Button icon={<ArrowUpRegular />} onClick={handleUp} />
+                </Tooltip>
+                <Tooltip content="Refresh" relationship="label">
+                    <Button icon={<ArrowClockwiseRegular />} onClick={() => fetchData(state.path, true)} />
+                </Tooltip>
+
+                <Tooltip content="Open Selected Folder" relationship="label">
+                    <Button
+                        icon={<OpenRegular />}
+                        disabled={!selectedItem || !selectedItem.is_dir}
+                        onClick={() => selectedItem && handleNavigate(selectedItem.path)}
+                    />
+                </Tooltip>
 
                 <div className={styles.pathBar}>
                     <Input
@@ -228,9 +260,9 @@ export const FileExplorer = () => {
                     columns={columns}
                     sortable
                     selectionMode="single"
-                    onSelectionChange={(e, data) => {
-                        // Handle selection
-                    }}
+                    selectedItems={selectedItems}
+                    onSelectionChange={(e, data) => setSelectedItems(data.selectedItems)}
+                    getRowId={(item) => item.path}
                 >
                     <DataGridHeader>
                         <DataGridRow>
@@ -257,23 +289,15 @@ export const FileExplorer = () => {
                                 )}
                             </DataGridRow>
                         )}
-                    </DataGridBody >
-                </DataGrid >
-            </div >
+                    </DataGridBody>
+                </DataGrid>
+            </div>
 
             {/* Status Bar */}
-            < div className={styles.statusBar} >
+            <div className={styles.statusBar}>
                 <Text>{items.length} items</Text>
                 <Text>Total Size: {formatSize(state.data?.size || 0)}</Text>
-            </div >
-        </div >
+            </div>
+        </div>
     );
 };
-
-function formatSize(bytes: number): string {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
