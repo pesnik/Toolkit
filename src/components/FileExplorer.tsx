@@ -37,7 +37,9 @@ import {
     FolderOpenRegular,
     HomeRegular,
     HardDriveRegular,
+    DataPieRegular,
 } from '@fluentui/react-icons';
+import { DiskUsageChart } from './DiskUsageChart';
 import { invoke } from '@tauri-apps/api/core';
 import { FileNode } from '@/types';
 
@@ -96,6 +98,7 @@ export const FileExplorer = () => {
 
     const [inputPath, setInputPath] = React.useState(state.path);
     const [selectedItems, setSelectedItems] = React.useState<Set<SelectionItemId>>(new Set());
+    const [showChart, setShowChart] = React.useState(false);
 
     // Context Menu State
     const [contextMenuOpen, setContextMenuOpen] = React.useState(false);
@@ -282,6 +285,10 @@ export const FileExplorer = () => {
         <div className={styles.container}>
             {/* Toolbar */}
             <div className={styles.toolbar}>
+                <Tooltip content="Home" relationship="label">
+                    <Button icon={<HomeRegular />} onClick={() => handleNavigate('')} />
+                </Tooltip>
+
                 <Tooltip content="Back" relationship="label">
                     <Button icon={<ArrowLeftRegular />} disabled={state.historyIndex <= 0} onClick={handleBack} />
                 </Tooltip>
@@ -297,6 +304,14 @@ export const FileExplorer = () => {
                 </Tooltip>
                 <Tooltip content="Refresh" relationship="label">
                     <Button icon={<ArrowClockwiseRegular />} onClick={() => fetchData(state.path, true)} />
+                </Tooltip>
+
+                <Tooltip content="Toggle Disk Usage Chart" relationship="label">
+                    <Button
+                        icon={<DataPieRegular />}
+                        appearance={showChart ? "primary" : "secondary"}
+                        onClick={() => setShowChart(!showChart)}
+                    />
                 </Tooltip>
 
                 <div className={styles.pathBar}>
@@ -315,86 +330,96 @@ export const FileExplorer = () => {
             {state.loading && <ProgressBar />}
             {state.error && <Text style={{ color: 'red' }}>{state.error}</Text>}
 
-            {/* Grid */}
-            <div className={styles.gridContainer}>
-                <DataGrid
-                    items={items}
-                    columns={columns}
-                    sortable
-                    selectionMode="single"
-                    selectedItems={selectedItems}
-                    onSelectionChange={(e, data) => setSelectedItems(data.selectedItems)}
-                    getRowId={(item) => item.path}
-                >
-                    <DataGridHeader>
-                        <DataGridRow>
-                            {({ renderHeaderCell }) => (
-                                <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>
-                            )}
-                        </DataGridRow>
-                    </DataGridHeader>
-                    <DataGridBody<FileNode>>
-                        {({ item, rowId }) => (
-                            <DataGridRow<FileNode>
-                                key={rowId}
-                                onContextMenu={(e: React.MouseEvent) => {
-                                    e.preventDefault();
-                                    setContextMenuItem(item);
-                                    setContextMenuLocation({ x: e.clientX, y: e.clientY });
-                                    setContextMenuOpen(true);
-                                    setSelectedItems(new Set([item.path])); // Auto select on right click
-                                }}
-                                onDoubleClick={() => {
-                                    if (item.is_dir) handleNavigate(item.path);
-                                }}
-                                onKeyDown={(e: React.KeyboardEvent) => {
-                                    if ((e.key === 'Enter' || e.key === 'ArrowRight') && item.is_dir) {
-                                        handleNavigate(item.path);
-                                    }
-                                }}
-                            >
-                                {({ renderCell }) => (
-                                    <DataGridCell>{renderCell(item)}</DataGridCell>
+            {/* Main Content Area (Grid + Chart) */}
+            <div style={{ display: 'flex', flexGrow: 1, overflow: 'hidden', gap: '10px' }}>
+                {/* Grid */}
+                <div className={styles.gridContainer} style={{ flexGrow: 1, width: showChart ? '60%' : '100%' }}>
+                    <DataGrid
+                        items={items}
+                        columns={columns}
+                        sortable
+                        selectionMode="single"
+                        selectedItems={selectedItems}
+                        onSelectionChange={(e, data) => setSelectedItems(data.selectedItems)}
+                        getRowId={(item) => item.path}
+                    >
+                        <DataGridHeader>
+                            <DataGridRow>
+                                {({ renderHeaderCell }) => (
+                                    <DataGridHeaderCell>{renderHeaderCell()}</DataGridHeaderCell>
                                 )}
                             </DataGridRow>
-                        )}
-                    </DataGridBody>
-                </DataGrid>
+                        </DataGridHeader>
+                        <DataGridBody<FileNode>>
+                            {({ item, rowId }) => (
+                                <DataGridRow<FileNode>
+                                    key={rowId}
+                                    onContextMenu={(e: React.MouseEvent) => {
+                                        e.preventDefault();
+                                        setContextMenuItem(item);
+                                        setContextMenuLocation({ x: e.clientX, y: e.clientY });
+                                        setContextMenuOpen(true);
+                                        setSelectedItems(new Set([item.path])); // Auto select on right click
+                                    }}
+                                    onDoubleClick={() => {
+                                        if (item.is_dir) handleNavigate(item.path);
+                                    }}
+                                    onKeyDown={(e: React.KeyboardEvent) => {
+                                        if ((e.key === 'Enter' || e.key === 'ArrowRight') && item.is_dir) {
+                                            handleNavigate(item.path);
+                                        }
+                                    }}
+                                >
+                                    {({ renderCell }) => (
+                                        <DataGridCell>{renderCell(item)}</DataGridCell>
+                                    )}
+                                </DataGridRow>
+                            )}
+                        </DataGridBody>
+                    </DataGrid>
 
-                {/* Context Menu */}
-                <Menu
-                    open={contextMenuOpen}
-                    onOpenChange={(e, data) => setContextMenuOpen(data.open)}
-                    positioning={{
-                        target: {
-                            getBoundingClientRect: () => ({
-                                top: contextMenuLocation.y,
-                                left: contextMenuLocation.x,
-                                right: contextMenuLocation.x,
-                                bottom: contextMenuLocation.y,
-                                width: 0,
-                                height: 0,
-                                x: contextMenuLocation.x,
-                                y: contextMenuLocation.y,
-                                toJSON: () => { },
-                            }),
-                        },
-                    }}
-                >
-                    <MenuPopover>
-                        <MenuList>
-                            <MenuItem icon={<OpenRegular />} onClick={() => contextMenuItem && handleNavigate(contextMenuItem.path)} disabled={!contextMenuItem?.is_dir}>
-                                Open
-                            </MenuItem>
-                            <MenuItem icon={<FolderOpenRegular />} onClick={() => contextMenuItem && handleOpenInExplorer(contextMenuItem)}>
-                                Reveal in Explorer/Finder
-                            </MenuItem>
-                            <MenuItem icon={<DeleteRegular />} onClick={() => contextMenuItem && handleDelete(contextMenuItem)}>
-                                Delete
-                            </MenuItem>
-                        </MenuList>
-                    </MenuPopover>
-                </Menu>
+                    {/* Context Menu */}
+                    <Menu
+                        open={contextMenuOpen}
+                        onOpenChange={(e, data) => setContextMenuOpen(data.open)}
+                        positioning={{
+                            target: {
+                                getBoundingClientRect: () => ({
+                                    top: contextMenuLocation.y,
+                                    left: contextMenuLocation.x,
+                                    right: contextMenuLocation.x,
+                                    bottom: contextMenuLocation.y,
+                                    width: 0,
+                                    height: 0,
+                                    x: contextMenuLocation.x,
+                                    y: contextMenuLocation.y,
+                                    toJSON: () => { },
+                                }),
+                            },
+                        }}
+                    >
+                        <MenuPopover>
+                            <MenuList>
+                                <MenuItem icon={<OpenRegular />} onClick={() => contextMenuItem && handleNavigate(contextMenuItem.path)} disabled={!contextMenuItem?.is_dir}>
+                                    Open
+                                </MenuItem>
+                                <MenuItem icon={<FolderOpenRegular />} onClick={() => contextMenuItem && handleOpenInExplorer(contextMenuItem)}>
+                                    Reveal in Explorer/Finder
+                                </MenuItem>
+                                <MenuItem icon={<DeleteRegular />} onClick={() => contextMenuItem && handleDelete(contextMenuItem)}>
+                                    Delete
+                                </MenuItem>
+                            </MenuList>
+                        </MenuPopover>
+                    </Menu>
+                </div>
+
+                {/* Chart Panel */}
+                {showChart && items.length > 0 && (
+                    <div style={{ width: '40%', minWidth: '300px', display: 'flex', flexDirection: 'column' }}>
+                        <DiskUsageChart items={items} />
+                    </div>
+                )}
             </div>
 
             {/* Status Bar */}
