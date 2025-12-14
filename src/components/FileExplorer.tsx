@@ -20,7 +20,6 @@ import {
     Tooltip,
     SelectionItemId,
     Menu,
-    MenuTrigger,
     MenuList,
     MenuItem,
     MenuPopover,
@@ -194,7 +193,7 @@ export const FileExplorer = () => {
             setState(prev => ({ ...prev, loading: false, data, path }));
             setInputPath(path);
             setSelectedItems(new Set()); // Clear selection on navigate
-        } catch (e: any) {
+        } catch (e: unknown) {
             setState(prev => ({ ...prev, loading: false, error: String(e) }));
         }
     };
@@ -235,6 +234,7 @@ export const FileExplorer = () => {
         }
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const handleForward = () => {
         if (state.historyIndex < state.history.length - 1) {
             const newIndex = state.historyIndex + 1;
@@ -272,11 +272,23 @@ export const FileExplorer = () => {
         }
     };
 
-    const handleOpenInExplorer = async (item: FileNode) => {
+    const handleRevealInExplorer = async (item: FileNode) => {
         try {
-            await invoke('open_in_explorer', { path: item.path });
+            await invoke('reveal_in_explorer', { path: item.path });
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    const handleOpenFile = async (item: FileNode) => {
+        if (item.is_dir) {
+            handleNavigate(item.path);
+        } else {
+            try {
+                await invoke('open_file', { path: item.path });
+            } catch (e) {
+                console.error(e);
+            }
         }
     };
 
@@ -368,12 +380,10 @@ export const FileExplorer = () => {
                                         setContextMenuOpen(true);
                                         setSelectedItems(new Set([item.path])); // Auto select on right click
                                     }}
-                                    onDoubleClick={() => {
-                                        if (item.is_dir) handleNavigate(item.path);
-                                    }}
+                                    onDoubleClick={() => handleOpenFile(item)}
                                     onKeyDown={(e: React.KeyboardEvent) => {
-                                        if ((e.key === 'Enter' || e.key === 'ArrowRight') && item.is_dir) {
-                                            handleNavigate(item.path);
+                                        if (e.key === 'Enter') {
+                                            handleOpenFile(item);
                                         }
                                     }}
                                 >
@@ -407,10 +417,10 @@ export const FileExplorer = () => {
                     >
                         <MenuPopover>
                             <MenuList>
-                                <MenuItem icon={<OpenRegular />} onClick={() => contextMenuItem && handleNavigate(contextMenuItem.path)} disabled={!contextMenuItem?.is_dir}>
+                                <MenuItem icon={<OpenRegular />} onClick={() => contextMenuItem && handleOpenFile(contextMenuItem)}>
                                     Open
                                 </MenuItem>
-                                <MenuItem icon={<FolderOpenRegular />} onClick={() => contextMenuItem && handleOpenInExplorer(contextMenuItem)}>
+                                <MenuItem icon={<FolderOpenRegular />} onClick={() => contextMenuItem && handleRevealInExplorer(contextMenuItem)}>
                                     Reveal in Explorer/Finder
                                 </MenuItem>
                                 <MenuItem icon={<InfoRegular />} onClick={() => contextMenuItem && handleProperties(contextMenuItem)} disabled={!contextMenuItem}>

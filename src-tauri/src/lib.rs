@@ -18,7 +18,8 @@ pub fn run() {
         commands::scan_dir,
         commands::refresh_scan,
         commands::clear_cache,
-        commands::open_in_explorer,
+        commands::reveal_in_explorer,
+        commands::open_file,
         commands::delete_item,
         commands::get_drives
     ])

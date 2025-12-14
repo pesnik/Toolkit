@@ -47,7 +47,6 @@ export const DiskUsageChart: React.FC<DiskUsageChartProps> = ({ items }) => {
 
         // Sort by size desc
         const sorted = [...items].sort((a, b) => b.size - a.size);
-        const totalSize = sorted.reduce((acc, item) => acc + item.size, 0);
 
         // Take top 8
         const topN = 8;
@@ -95,17 +94,13 @@ export const DiskUsageChart: React.FC<DiskUsageChartProps> = ({ items }) => {
                             fill="#8884d8"
                             dataKey="value"
                             nameKey="name"
-                            label={({ cx, cy, midAngle, innerRadius, outerRadius, percent, index }) => {
-                                // Simplified label logic or just use Tooltip
-                                return null;
-                            }}
                         >
                             {data.map((entry, index) => (
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                             ))}
                         </Pie>
                         <RechartsTooltip
-                            formatter={(value: number, name: string, props: any) => [props.payload.formattedSize, name]}
+                            formatter={(value: number, name: string, props: any) => [props?.payload?.formattedSize || value, name]}
                         />
                         <Legend wrapperStyle={{ fontSize: '12px' }} />
                     </PieChart>

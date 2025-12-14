@@ -116,7 +116,43 @@ pub fn clear_cache() {
 }
 
 #[command]
-pub fn open_in_explorer(path: String) {
+pub fn reveal_in_explorer(path: String) {
+    #[cfg(target_os = "windows")]
+    {
+        use std::process::Command;
+        Command::new("explorer")
+            .arg("/select,")
+            .arg(&path)
+            .spawn()
+            .unwrap();
+    }
+    #[cfg(target_os = "macos")]
+    {
+        use std::process::Command;
+        Command::new("open")
+            .arg("-R")
+            .arg(&path)
+            .spawn()
+            .unwrap();
+    }
+    #[cfg(target_os = "linux")]
+    {
+        use std::process::Command;
+        // Try to select if possible, otherwise just open parent
+        // dbus-send or specific file manager calls would be improved here.
+        // For now, let's just open the parent folder.
+        let p = std::path::Path::new(&path);
+        if let Some(parent) = p.parent() {
+             Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .unwrap();
+        }
+    }
+}
+
+#[command]
+pub fn open_file(path: String) {
     #[cfg(target_os = "windows")]
     {
         use std::process::Command;
