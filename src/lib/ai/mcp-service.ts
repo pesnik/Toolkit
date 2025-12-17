@@ -202,7 +202,7 @@ class MCPService {
     }
 
     /**
-     * Format tools for LLM prompt (OpenAI function calling format)
+     * Format tools for LLM prompt with full schema details
      */
     formatToolsForPrompt(): string {
         if (this.tools.length === 0) {
@@ -216,9 +216,23 @@ class MCPService {
                 if (tool.annotations?.idempotentHint) hints.push('idempotent');
                 if (tool.annotations?.destructiveHint) hints.push('DESTRUCTIVE');
 
-                return `- ${tool.name}: ${tool.description}${hints.length > 0 ? ` [${hints.join(', ')}]` : ''}`;
+                // Format the schema for better readability
+                const schemaStr = JSON.stringify(tool.inputSchema, null, 2);
+
+                const parts = [
+                    `Tool: ${tool.name}`,
+                    `Description: ${tool.description}`,
+                ];
+
+                if (hints.length > 0) {
+                    parts.push(`Hints: ${hints.join(', ')}`);
+                }
+
+                parts.push(`Input Schema:\n${schemaStr}`);
+
+                return parts.join('\n');
             })
-            .join('\n');
+            .join('\n\n---\n\n');
     }
 
     /**

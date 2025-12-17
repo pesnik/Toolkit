@@ -24,8 +24,21 @@ export function extractToolCalls(content: string): ToolCall[] {
 
     while ((match = regex.exec(content)) !== null) {
         try {
-            const jsonContent = match[1].trim();
+            let jsonContent = match[1].trim();
+
+            console.log('[ToolCalling] Raw JSON content:', jsonContent);
+
+            // Try to extract just the JSON object if there's extra text
+            const jsonMatch = jsonContent.match(/\{[\s\S]*\}/);
+            if (jsonMatch) {
+                jsonContent = jsonMatch[0];
+            }
+
+            console.log('[ToolCalling] Cleaned JSON:', jsonContent);
+
             const parsed = JSON.parse(jsonContent);
+
+            console.log('[ToolCalling] Parsed tool call:', parsed);
 
             // Validate required fields
             if (parsed.name && parsed.arguments) {
@@ -34,12 +47,17 @@ export function extractToolCalls(content: string): ToolCall[] {
                     name: parsed.name,
                     arguments: parsed.arguments,
                 });
+                console.log('[ToolCalling] ✅ Valid tool call added:', parsed.name);
+            } else {
+                console.warn('[ToolCalling] ⚠️ Tool call missing required fields:', parsed);
             }
         } catch (error) {
-            console.error('[ToolCalling] Failed to parse tool call:', error);
+            console.error('[ToolCalling] ❌ Failed to parse tool call:', error);
+            console.error('[ToolCalling] Content that failed:', match[1]);
         }
     }
 
+    console.log(`[ToolCalling] Total tool calls extracted: ${toolCalls.length}`);
     return toolCalls;
 }
 

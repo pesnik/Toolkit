@@ -41,6 +41,7 @@ import {
 import { aiConfig, getDefaultEndpoint, loadAIConfig } from '@/lib/ai/config';
 import { mcpManager } from '@/lib/ai/mcp-manager';
 import { runInferenceWithTools } from '@/lib/ai/inference-with-tools';
+import { removeToolCallTags } from '@/lib/ai/tool-calling';
 
 const useStyles = makeStyles({
     container: {
@@ -551,6 +552,13 @@ export const AIPanel = ({
                           ));
                   } : undefined);
 
+            // Clean tool call tags from the response before displaying to user
+            const cleanedContent = removeToolCallTags(response.message.content);
+            const cleanedMessage = {
+                ...response.message,
+                content: cleanedContent || response.message.content, // Fallback to original if cleaning results in empty string
+            };
+
             if (isStreaming) {
                 // Remove download message if still present
                 if (downloadMsgId) {
@@ -559,12 +567,12 @@ export const AIPanel = ({
                 // Final update for streaming (ensure exact final state and remove streaming flag)
                 setMessages((prev) => prev.map(msg =>
                     msg.id === assistantMsgId
-                        ? { ...response.message, isStreaming: false }
+                        ? { ...cleanedMessage, isStreaming: false }
                         : msg
                 ));
             } else {
                 // Non-streaming: Add the full message now
-                setMessages((prev) => [...prev, response.message]);
+                setMessages((prev) => [...prev, cleanedMessage]);
             }
         } catch (error: any) {
             console.error('Inference failed:', error);

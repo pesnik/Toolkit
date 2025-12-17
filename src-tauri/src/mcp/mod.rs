@@ -9,10 +9,12 @@
 pub mod server;
 pub mod types;
 pub mod client;
+pub mod native_server;
 
 pub use server::MCPServer;
 pub use types::*;
 pub use client::MCPClient;
+pub use native_server::{NativeMCPServer, ServerInfo, FileInfo, ToolDefinition};
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

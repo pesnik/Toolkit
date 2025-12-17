@@ -1,0 +1,424 @@
+/**
+ * Native Rust MCP Server Implementation
+ *
+ * Provides filesystem tools using the official Rust MCP SDK (rmcp).
+ * This replaces the subprocess-based Node.js implementation.
+ */
+
+use super::{MCPConfig, MCPError, MCPResult};
+use log::{debug, error, info, warn};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+/// Native MCP Server with filesystem tools
+pub struct NativeMCPServer {
+    config: Arc<RwLock<MCPConfig>>,
+    initialized: Arc<RwLock<bool>>,
+}
+
+impl NativeMCPServer {
+    /// Create a new native MCP server
+    pub fn new(config: MCPConfig) -> Self {
+        Self {
+            config: Arc::new(RwLock::new(config)),
+            initialized: Arc::new(RwLock::new(false)),
+        }
+    }
+
+    /// Initialize the server
+    pub async fn initialize(&self) -> MCPResult<ServerInfo> {
+        let mut init_guard = self.initialized.write().await;
+
+        if *init_guard {
+            return Err(MCPError {
+                code: -32008,
+                message: "Server already initialized".to_string(),
+                data: None,
+            });
+        }
+
+        info!("Initializing native Rust MCP server...");
+
+        *init_guard = true;
+
+        Ok(ServerInfo {
+            name: "helium-mcp-fs".to_string(),
+            version: "0.2.0".to_string(),
+            protocol_version: "2024-11-05".to_string(),
+        })
+    }
+
+    /// Check if path is allowed
+    async fn is_path_allowed(&self, path: &Path) -> bool {
+        let config = self.config.read().await;
+        let abs_path = match path.canonicalize() {
+            Ok(p) => p,
+            Err(_) => return false,
+        };
+
+        config.allowed_directories.iter().any(|allowed| {
+            let allowed_path = match PathBuf::from(allowed).canonicalize() {
+                Ok(p) => p,
+                Err(_) => return false,
+            };
+            abs_path.starts_with(&allowed_path)
+        })
+    }
+
+    /// Read file contents
+    pub async fn read_file(&self, path: String) -> MCPResult<String> {
+        let path = PathBuf::from(&path);
+
+        if !self.is_path_allowed(&path).await {
+            return Err(MCPError {
+                code: -32001,
+                message: format!("Access denied: {} is not in allowed directories", path.display()),
+                data: None,
+            });
+        }
+
+        // Check file size limit
+        let metadata = fs::metadata(&path)?;
+        let config = self.config.read().await;
+
+        if let Some(max_size) = config.max_file_size {
+            if metadata.len() > max_size {
+                return Err(MCPError {
+                    code: -32002,
+                    message: format!(
+                        "File too large: {} bytes (max: {} bytes)",
+                        metadata.len(),
+                        max_size
+                    ),
+                    data: None,
+                });
+            }
+        }
+
+        debug!("Reading file: {}", path.display());
+        let content = fs::read_to_string(&path)?;
+        Ok(content)
+    }
+
+    /// Write file contents
+    pub async fn write_file(&self, path: String, content: String) -> MCPResult<()> {
+        let path = PathBuf::from(&path);
+
+        if !self.is_path_allowed(&path).await {
+            return Err(MCPError {
+                code: -32001,
+                message: format!("Access denied: {} is not in allowed directories", path.display()),
+                data: None,
+            });
+        }
+
+        debug!("Writing file: {}", path.display());
+        fs::write(&path, content)?;
+        Ok(())
+    }
+
+    /// List directory contents
+    pub async fn list_directory(&self, path: String) -> MCPResult<Vec<FileInfo>> {
+        let path = PathBuf::from(&path);
+
+        if !self.is_path_allowed(&path).await {
+            return Err(MCPError {
+                code: -32001,
+                message: format!("Access denied: {} is not in allowed directories", path.display()),
+                data: None,
+            });
+        }
+
+        debug!("Listing directory: {}", path.display());
+        let entries = fs::read_dir(&path)?;
+        let mut files = Vec::new();
+
+        for entry in entries {
+            let entry = entry?;
+            let metadata = entry.metadata()?;
+            let path = entry.path();
+
+            files.push(FileInfo {
+                name: entry.file_name().to_string_lossy().to_string(),
+                path: path.to_string_lossy().to_string(),
+                is_dir: metadata.is_dir(),
+                size: metadata.len(),
+                modified: metadata
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map(|d| d.as_secs()),
+            });
+        }
+
+        files.sort_by(|a, b| {
+            // Directories first, then alphabetically
+            match (a.is_dir, b.is_dir) {
+                (true, false) => std::cmp::Ordering::Less,
+                (false, true) => std::cmp::Ordering::Greater,
+                _ => a.name.cmp(&b.name),
+            }
+        });
+
+        Ok(files)
+    }
+
+    /// Search for files matching a pattern
+    pub async fn search_files(&self, directory: String, pattern: String) -> MCPResult<Vec<String>> {
+        let dir_path = PathBuf::from(&directory);
+
+        if !self.is_path_allowed(&dir_path).await {
+            return Err(MCPError {
+                code: -32001,
+                message: format!("Access denied: {} is not in allowed directories", dir_path.display()),
+                data: None,
+            });
+        }
+
+        debug!("Searching for '{}' in {}", pattern, dir_path.display());
+
+        let mut results = Vec::new();
+        let pattern_lower = pattern.to_lowercase();
+
+        fn search_recursive(
+            path: &Path,
+            pattern: &str,
+            results: &mut Vec<String>,
+            max_depth: usize,
+            current_depth: usize,
+        ) -> std::io::Result<()> {
+            if current_depth > max_depth {
+                return Ok(());
+            }
+
+            for entry in fs::read_dir(path)? {
+                let entry = entry?;
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().to_lowercase();
+
+                if name.contains(pattern) {
+                    results.push(path.to_string_lossy().to_string());
+                }
+
+                if path.is_dir() && current_depth < max_depth {
+                    let _ = search_recursive(&path, pattern, results, max_depth, current_depth + 1);
+                }
+            }
+            Ok(())
+        }
+
+        search_recursive(&dir_path, &pattern_lower, &mut results, 3, 0)?;
+        Ok(results)
+    }
+
+    /// Get file metadata
+    pub async fn get_file_info(&self, path: String) -> MCPResult<FileInfo> {
+        let path = PathBuf::from(&path);
+
+        if !self.is_path_allowed(&path).await {
+            return Err(MCPError {
+                code: -32001,
+                message: format!("Access denied: {} is not in allowed directories", path.display()),
+                data: None,
+            });
+        }
+
+        let metadata = fs::metadata(&path)?;
+
+        Ok(FileInfo {
+            name: path
+                .file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_default(),
+            path: path.to_string_lossy().to_string(),
+            is_dir: metadata.is_dir(),
+            size: metadata.len(),
+            modified: metadata
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_secs()),
+        })
+    }
+
+    /// Move/rename a file or directory
+    pub async fn move_file(&self, from: String, to: String) -> MCPResult<()> {
+        let from_path = PathBuf::from(&from);
+        let to_path = PathBuf::from(&to);
+
+        if !self.is_path_allowed(&from_path).await || !self.is_path_allowed(&to_path).await {
+            return Err(MCPError {
+                code: -32001,
+                message: "Access denied: paths are not in allowed directories".to_string(),
+                data: None,
+            });
+        }
+
+        debug!("Moving {} to {}", from_path.display(), to_path.display());
+        fs::rename(&from_path, &to_path)?;
+        Ok(())
+    }
+
+    /// Create a directory
+    pub async fn create_directory(&self, path: String) -> MCPResult<()> {
+        let path = PathBuf::from(&path);
+
+        if !self.is_path_allowed(&path).await {
+            return Err(MCPError {
+                code: -32001,
+                message: format!("Access denied: {} is not in allowed directories", path.display()),
+                data: None,
+            });
+        }
+
+        debug!("Creating directory: {}", path.display());
+        fs::create_dir_all(&path)?;
+        Ok(())
+    }
+
+    /// Get list of available tools
+    pub fn get_tools() -> Vec<ToolDefinition> {
+        vec![
+            ToolDefinition {
+                name: "read_file".to_string(),
+                description: "Read the complete contents of a file from the file system. Use this when you need to examine file contents.".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Absolute path to the file to read"
+                        }
+                    },
+                    "required": ["path"]
+                }),
+            },
+            ToolDefinition {
+                name: "write_file".to_string(),
+                description: "Write content to a file. Creates the file if it doesn't exist, overwrites if it does.".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Absolute path to the file to write"
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Content to write to the file"
+                        }
+                    },
+                    "required": ["path", "content"]
+                }),
+            },
+            ToolDefinition {
+                name: "list_directory".to_string(),
+                description: "Get a detailed listing of all files and directories in a specified path. Returns file metadata including names, sizes, types, and modification times.".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Absolute path to the directory to list"
+                        }
+                    },
+                    "required": ["path"]
+                }),
+            },
+            ToolDefinition {
+                name: "search_files".to_string(),
+                description: "Recursively search for files and directories matching a pattern within a directory (up to 3 levels deep).".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "directory": {
+                            "type": "string",
+                            "description": "Absolute path to search in"
+                        },
+                        "pattern": {
+                            "type": "string",
+                            "description": "Search pattern (case-insensitive substring match)"
+                        }
+                    },
+                    "required": ["directory", "pattern"]
+                }),
+            },
+            ToolDefinition {
+                name: "get_file_info".to_string(),
+                description: "Retrieve detailed metadata about a file or directory, including size, type, and modification time.".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Absolute path to the file or directory"
+                        }
+                    },
+                    "required": ["path"]
+                }),
+            },
+            ToolDefinition {
+                name: "move_file".to_string(),
+                description: "Move or rename a file or directory to a new location.".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "from": {
+                            "type": "string",
+                            "description": "Current absolute path"
+                        },
+                        "to": {
+                            "type": "string",
+                            "description": "New absolute path"
+                        }
+                    },
+                    "required": ["from", "to"]
+                }),
+            },
+            ToolDefinition {
+                name: "create_directory".to_string(),
+                description: "Create a new directory or ensure a directory exists. Creates parent directories if needed.".to_string(),
+                input_schema: serde_json::json!({
+                    "type": "object",
+                    "properties": {
+                        "path": {
+                            "type": "string",
+                            "description": "Absolute path to the directory to create"
+                        }
+                    },
+                    "required": ["path"]
+                }),
+            },
+        ]
+    }
+}
+
+/// Server information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServerInfo {
+    pub name: String,
+    pub version: String,
+    pub protocol_version: String,
+}
+
+/// File information
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct FileInfo {
+    pub name: String,
+    pub path: String,
+    pub is_dir: bool,
+    pub size: u64,
+    pub modified: Option<u64>,
+}
+
+/// Tool definition
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolDefinition {
+    pub name: String,
+    pub description: String,
+    pub input_schema: serde_json::Value,
+}

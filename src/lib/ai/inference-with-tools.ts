@@ -55,8 +55,12 @@ export async function runInferenceWithTools(
         // Check if response contains tool calls
         const hasToolCalls = detectToolCall(response.message.content);
 
+        console.log(`[InferenceWithTools] Response content preview:`, response.message.content.substring(0, 200));
+        console.log(`[InferenceWithTools] Has tool calls:`, hasToolCalls);
+
         if (!hasToolCalls) {
             // No tool calls - we're done
+            console.log(`[InferenceWithTools] No tool calls detected, finishing`);
             finalResponse = response;
             break;
         }
@@ -64,8 +68,11 @@ export async function runInferenceWithTools(
         // Extract tool calls
         const toolCalls = extractToolCalls(response.message.content);
 
+        console.log(`[InferenceWithTools] Extracted ${toolCalls.length} tool calls`);
+
         if (toolCalls.length === 0) {
             // False positive - no valid tool calls found
+            console.log(`[InferenceWithTools] Tool call tags found but extraction failed`);
             finalResponse = response;
             break;
         }
