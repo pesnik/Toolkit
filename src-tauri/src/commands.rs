@@ -1,5 +1,6 @@
 use tauri::{command, AppHandle, Emitter};
 use crate::scanner::{scan_directory, FileNode, ScanStats};
+use crate::cleaner::{self, JunkCategory};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -43,6 +44,7 @@ struct ScanProgress {
     path: String, // Just the root path being scanned
     count: u64,
     size: u64,
+    errors: u64,
 }
 
 #[command]
@@ -87,6 +89,7 @@ async fn scan_dir_internal(app: AppHandle, path: String, force_refresh: bool) ->
     let stats = Arc::new(ScanStats {
         scanned_files: AtomicU64::new(0),
         total_size: AtomicU64::new(0),
+        errors: AtomicU64::new(0),
     });
 
     let is_done = Arc::new(AtomicBool::new(false));
@@ -101,20 +104,24 @@ async fn scan_dir_internal(app: AppHandle, path: String, force_refresh: bool) ->
     tauri::async_runtime::spawn(async move {
         // Emit every 100ms
         loop {
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            // Check BEFORE sleeping to avoid emitting after done
             if cancel_clone.load(Ordering::Relaxed) || is_done_clone.load(Ordering::Relaxed) {
                 break;
             }
-            
+
             let count = stats_clone.scanned_files.load(Ordering::Relaxed);
             let size = stats_clone.total_size.load(Ordering::Relaxed);
-            
+            let errors = stats_clone.errors.load(Ordering::Relaxed);
+
             let payload = ScanProgress {
                  path: path_report.clone(),
                  count,
-                 size
+                 size,
+                 errors
             };
             let _ = app_handle.emit("scan-progress", payload);
+
+            tokio::time::sleep(Duration::from_millis(100)).await;
         }
     });
 
@@ -285,3 +292,26 @@ pub fn get_drives() -> Vec<FileNode> {
     }
     drives
 }
+
+#[command]
+pub async fn scan_junk() -> Result<Vec<JunkCategory>, String> {
+    // This could also be spawned blocking if it takes time
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        cleaner::scan_junk_items()
+    }).await.map_err(|e| e.to_string())?;
+    
+    Ok(result)
+}
+
+#[command]
+pub async fn clean_junk(paths: Vec<String>) -> Result<(), String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        cleaner::delete_junk_items(paths)
+    }).await.map_err(|e| e.to_string())??;
+    
+    // Invalidate main scan cache just in case we deleted something overlapping
+    clear_cache();
+    
+    Ok(())
+}
+
