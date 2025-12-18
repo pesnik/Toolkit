@@ -460,6 +460,7 @@ export const AIPanel = ({
             // Add endpoint for OpenAI-compatible and Ollama providers
             // Priority: 1) localStorage (user custom endpoint), 2) model config (from runtime config/backend), 3) runtime config fallback
             let endpointToUse: string | undefined;
+            let customModelName: string | undefined;
             if (activeProvider === ModelProvider.OpenAICompatible || activeProvider === ModelProvider.Ollama) {
                 // CRITICAL FIX: Use activeProvider (current state) instead of selectedModel.provider (can be stale)
                 // This prevents race conditions when user switches providers and immediately sends a message
@@ -470,20 +471,32 @@ export const AIPanel = ({
                                selectedModel.endpoint ||
                                await getDefaultEndpoint(activeProvider);
 
+                // Load custom model name for OpenAI-compatible
+                if (activeProvider === ModelProvider.OpenAICompatible) {
+                    customModelName = localStorage.getItem('customModelName_openaiCompatible') || undefined;
+                }
+
                 // Validation: Warn if model provider doesn't match active provider (indicates state sync issue)
                 if (selectedModel.provider !== activeProvider) {
                     console.warn(`[AIPanel] Provider mismatch detected! selectedModel.provider=${selectedModel.provider}, activeProvider=${activeProvider}. Using activeProvider for endpoint resolution.`);
                 }
             }
 
-            const modelConfigWithEndpoint = {
+            const modelConfigWithEndpoint: ModelConfig = {
                 ...selectedModel,
-                ...(endpointToUse ? { endpoint: endpointToUse } : {})
+                ...(endpointToUse ? { endpoint: endpointToUse } : {}),
+                // Use custom model name if provided for OpenAI-compatible
+                ...(customModelName ? { modelId: customModelName } : {}),
+                // Ensure provider is set correctly to prevent routing to wrong backend
+                provider: activeProvider || selectedModel.provider
             };
 
             console.log('[AIPanel] Selected model:', selectedModel.id);
             console.log('[AIPanel] Selected model endpoint:', selectedModel.endpoint);
             console.log('[AIPanel] endpointToUse:', endpointToUse);
+            console.log('[AIPanel] customModelName:', customModelName);
+            console.log('[AIPanel] Final modelConfigWithEndpoint.provider:', modelConfigWithEndpoint.provider);
+            console.log('[AIPanel] Final modelConfigWithEndpoint.modelId:', modelConfigWithEndpoint.modelId);
             console.log('[AIPanel] Final modelConfigWithEndpoint.endpoint:', modelConfigWithEndpoint.endpoint);
 
             // Use the cleaned messages (not the stale 'messages' variable!)

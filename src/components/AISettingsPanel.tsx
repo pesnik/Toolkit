@@ -36,6 +36,7 @@ import {
     GlobeRegular,
     Play24Regular,
     ArrowDownload24Regular,
+    DismissRegular,
 } from '@fluentui/react-icons';
 import { ModelConfig, ModelParameters, ModelProvider, AIMode, MessageRole } from '@/types/ai-types';
 import { runInference, createMessage } from '@/lib/ai/ai-service';
@@ -162,7 +163,7 @@ export function AISettingsPanel({
 }: AISettingsPanelProps) {
     const styles = useStyles();
     const toasterId = useId('toaster');
-    const { dispatchToast } = useToastController(toasterId);
+    const { dispatchToast, dismissToast } = useToastController(toasterId);
 
     // Defensive defaults in case modelConfig is missing (should be handled by parent)
     const [selectedTab, setSelectedTab] = React.useState<string>('general');
@@ -170,6 +171,7 @@ export function AISettingsPanel({
         temperature: 0.7, topP: 0.9, maxTokens: 2048, stream: true
     });
     const [customEndpoint, setCustomEndpoint] = React.useState<string>('');
+    const [customModelName, setCustomModelName] = React.useState<string>('');
 
     // Load config on mount to get the correct default endpoints
     React.useEffect(() => {
@@ -186,6 +188,14 @@ export function AISettingsPanel({
                 : config.endpoints.ollama
         );
         setCustomEndpoint(defaultEndpoint);
+
+        // Load custom model name for OpenAI-compatible provider
+        if (activeProvider === ModelProvider.OpenAICompatible) {
+            const savedModelName = localStorage.getItem('customModelName_openaiCompatible');
+            if (savedModelName) {
+                setCustomModelName(savedModelName);
+            }
+        }
     }, [activeProvider]);
 
     // Track if current config is set as default for the current mode
@@ -263,9 +273,18 @@ export function AISettingsPanel({
 
     const handleTestInference = async () => {
         if (!modelConfig || !activeProvider) {
-            dispatchToast(
+            const toastId = dispatchToast(
                 <Toast>
-                    <ToastTitle>Test Failed</ToastTitle>
+                    <ToastTitle action={
+                        <Button
+                            appearance="transparent"
+                            icon={<DismissRegular />}
+                            size="small"
+                            onClick={() => dismissToast(toastId)}
+                        />
+                    }>
+                        Test Failed
+                    </ToastTitle>
                     <ToastBody>No model selected</ToastBody>
                 </Toast>,
                 { intent: 'error' }
@@ -303,9 +322,18 @@ export function AISettingsPanel({
             const finalResponse = response.message.content || streamedResponse;
             // Don't set inline result for success, only show toast
 
-            dispatchToast(
+            const successToastId = dispatchToast(
                 <Toast>
-                    <ToastTitle>Test Successful</ToastTitle>
+                    <ToastTitle action={
+                        <Button
+                            appearance="transparent"
+                            icon={<DismissRegular />}
+                            size="small"
+                            onClick={() => dismissToast(successToastId)}
+                        />
+                    }>
+                        Test Successful
+                    </ToastTitle>
                     <ToastBody>Model responded: {finalResponse.substring(0, 50)}...</ToastBody>
                 </Toast>,
                 { intent: 'success' }
@@ -328,9 +356,18 @@ export function AISettingsPanel({
                 }
             }
 
-            dispatchToast(
+            const errorToastId = dispatchToast(
                 <Toast>
-                    <ToastTitle>Test Failed</ToastTitle>
+                    <ToastTitle action={
+                        <Button
+                            appearance="transparent"
+                            icon={<DismissRegular />}
+                            size="small"
+                            onClick={() => dismissToast(errorToastId)}
+                        />
+                    }>
+                        Test Failed
+                    </ToastTitle>
                     <ToastBody>{errorMessage}</ToastBody>
                 </Toast>,
                 { intent: 'error' }
@@ -425,22 +462,73 @@ export function AISettingsPanel({
                                                 Available Models {activeProvider && `(${activeProvider})`}
                                             </Label>
                                             {activeProvider === ModelProvider.OpenAICompatible && displayModels.length === 0 ? (
-                                                <div style={{ padding: '20px', color: tokens.colorNeutralForeground3 }}>
+                                                <div>
                                                     <Text block style={{ marginBottom: '12px', fontWeight: 600 }}>
-                                                        OpenAI-Compatible Server Setup
+                                                        Select a Model Configuration
                                                     </Text>
-                                                    <Text block size={200} style={{ marginBottom: '8px' }}>
-                                                        1. Set your base URL above (must end with <code>/v1</code>)
-                                                    </Text>
-                                                    <Text block size={200} style={{ marginBottom: '8px', marginLeft: '16px', color: tokens.colorNeutralForeground4 }}>
-                                                        Example: <code>http://127.0.0.1:8033/v1</code> for llama-server
-                                                    </Text>
-                                                    <Text block size={200} style={{ marginBottom: '12px' }}>
-                                                        2. The app will append <code>/chat/completions</code> for inference
-                                                    </Text>
-                                                    <Text block size={200}>
-                                                        3. Use the &quot;Test Inference&quot; button below to verify the connection
-                                                    </Text>
+                                                    <div className={styles.cardGrid}>
+                                                        <div
+                                                            className={`${styles.modelCard} ${customModelName === 'unified-mode' ? styles.selectedCard : ''}`}
+                                                            onClick={() => setCustomModelName('unified-mode')}
+                                                        >
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                                <CubeRegular />
+                                                            </div>
+                                                            <Text weight="semibold">Unified Mode</Text>
+                                                            <div className={styles.badgeRow}>
+                                                                <Badge appearance="tint" color="brand">Auto-detect</Badge>
+                                                            </div>
+                                                            <Text size={200} style={{ color: tokens.colorNeutralForeground2, marginTop: '8px' }}>
+                                                                Server determines model automatically
+                                                            </Text>
+                                                        </div>
+                                                        <div
+                                                            className={`${styles.modelCard} ${customModelName === 'openai-compatible-generic' ? styles.selectedCard : ''}`}
+                                                            onClick={() => setCustomModelName('openai-compatible-generic')}
+                                                        >
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                                                <CubeRegular />
+                                                            </div>
+                                                            <Text weight="semibold">OpenAI Compatible Generic</Text>
+                                                            <div className={styles.badgeRow}>
+                                                                <Badge appearance="tint" color="success">Manual</Badge>
+                                                            </div>
+                                                            <Text size={200} style={{ color: tokens.colorNeutralForeground2, marginTop: '8px' }}>
+                                                                Specify custom model name
+                                                            </Text>
+                                                        </div>
+                                                    </div>
+                                                    {customModelName && (
+                                                        <div style={{ marginTop: '16px', padding: '16px', backgroundColor: tokens.colorNeutralBackground2, borderRadius: '8px' }}>
+                                                            <Label size="small">Model Name</Label>
+                                                            <Input
+                                                                value={customModelName}
+                                                                onChange={(e) => setCustomModelName(e.target.value)}
+                                                                placeholder="Enter model name (e.g., gpt-4, llama-3-8b)"
+                                                                style={{ width: '100%', marginTop: '4px' }}
+                                                            />
+                                                            <Text block size={200} style={{ color: tokens.colorNeutralForeground3, marginTop: '8px' }}>
+                                                                This name will be sent to the OpenAI-compatible server
+                                                            </Text>
+                                                        </div>
+                                                    )}
+                                                    <div style={{ padding: '20px', color: tokens.colorNeutralForeground3, marginTop: '16px' }}>
+                                                        <Text block style={{ marginBottom: '12px', fontWeight: 600 }}>
+                                                            Setup Instructions
+                                                        </Text>
+                                                        <Text block size={200} style={{ marginBottom: '8px' }}>
+                                                            1. Set your base URL above (must end with <code>/v1</code>)
+                                                        </Text>
+                                                        <Text block size={200} style={{ marginBottom: '8px', marginLeft: '16px', color: tokens.colorNeutralForeground4 }}>
+                                                            Example: <code>http://127.0.0.1:8033/v1</code> for llama-server
+                                                        </Text>
+                                                        <Text block size={200} style={{ marginBottom: '12px' }}>
+                                                            2. Select a model configuration above
+                                                        </Text>
+                                                        <Text block size={200}>
+                                                            3. Use the &quot;Test Inference&quot; button below to verify the connection
+                                                        </Text>
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <div className={styles.cardGrid}>
@@ -706,6 +794,10 @@ export function AISettingsPanel({
                                         : 'defaultAIEndpoint_ollama';
                                     localStorage.setItem(endpointKey, customEndpoint);
                                 }
+                            }
+                            // Save custom model name for OpenAI-compatible
+                            if (activeProvider === ModelProvider.OpenAICompatible && customModelName) {
+                                localStorage.setItem('customModelName_openaiCompatible', customModelName);
                             }
                             onClose();
                         }} icon={<Save24Regular />}>
