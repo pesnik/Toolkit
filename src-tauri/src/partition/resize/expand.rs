@@ -31,7 +31,19 @@ async fn expand_partition_table(
         expand_partition_table_windows(partition, target_size).await
     }
 
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(target_os = "linux")]
+    {
+        expand_partition_table_linux(partition, target_size).await
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        // macOS uses diskutil resizeVolume which handles both partition and filesystem
+        // So we don't need separate partition table expansion
+        Ok(())
+    }
+
+    #[cfg(not(any(target_os = "windows", target_os = "linux", target_os = "macos")))]
     {
         Err(anyhow!("Partition table expansion not yet implemented for this platform"))
     }
@@ -83,6 +95,49 @@ async fn expand_partition_table_windows(
     Ok(())
 }
 
+/// Expand partition table on Linux using parted
+#[cfg(target_os = "linux")]
+async fn expand_partition_table_linux(
+    partition: &PartitionInfo,
+    target_size: u64,
+) -> Result<()> {
+    let device = &partition.device_path;
+    let size_mb = target_size / (1024 * 1024);
+
+    // Use parted to resize the partition
+    // Format: parted /dev/sda resizepart 1 100%
+    // or: parted /dev/sda resizepart 1 500MB
+
+    // Extract partition number from device path (e.g., /dev/sda1 -> 1)
+    let part_num = device
+        .chars()
+        .rev()
+        .take_while(|c| c.is_numeric())
+        .collect::<String>()
+        .chars()
+        .rev()
+        .collect::<String>();
+
+    // Extract base device (e.g., /dev/sda1 -> /dev/sda)
+    let base_device = device.trim_end_matches(&part_num);
+
+    let output = Command::new("parted")
+        .arg(base_device)
+        .arg("resizepart")
+        .arg(&part_num)
+        .arg(format!("{}MB", size_mb))
+        .output()?;
+
+    if !output.status.success() {
+        return Err(anyhow!(
+            "parted failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        ));
+    }
+
+    Ok(())
+}
+
 /// Expand the filesystem to fill the partition
 async fn expand_filesystem(
     partition: &PartitionInfo,
@@ -92,6 +147,9 @@ async fn expand_filesystem(
         FilesystemType::NTFS => expand_ntfs(partition, target_size).await,
         FilesystemType::Ext2 | FilesystemType::Ext3 | FilesystemType::Ext4 => {
             expand_ext4(partition, target_size).await
+        }
+        FilesystemType::APFS | FilesystemType::HFSPlus => {
+            expand_apfs_hfs(partition, target_size).await
         }
         _ => Err(anyhow!(
             "Filesystem expansion not supported for {}",
@@ -174,5 +232,42 @@ async fn expand_ext4(
     #[cfg(not(target_os = "linux"))]
     {
         Err(anyhow!("ext4 resize is only supported on Linux"))
+    }
+}
+
+/// Expand APFS or HFS+ filesystem (macOS)
+async fn expand_apfs_hfs(
+    partition: &PartitionInfo,
+    target_size: u64,
+) -> Result<()> {
+    #[cfg(target_os = "macos")]
+    {
+        let device = &partition.device_path;
+
+        // Convert target size to sectors or use "R" for maximum available
+        // diskutil resizeVolume can take size in various formats
+        // For expansion, we'll use the target size in bytes followed by "B"
+        let size_arg = format!("{}B", target_size);
+
+        // Use diskutil to resize the volume
+        let output = Command::new("diskutil")
+            .arg("resizeVolume")
+            .arg(device)
+            .arg(&size_arg)
+            .output()?;
+
+        if !output.status.success() {
+            return Err(anyhow!(
+                "diskutil resizeVolume failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+
+        Ok(())
+    }
+
+    #[cfg(not(target_os = "macos"))]
+    {
+        Err(anyhow!("APFS/HFS+ resize is only supported on macOS"))
     }
 }

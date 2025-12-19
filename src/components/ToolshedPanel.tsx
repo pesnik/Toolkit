@@ -143,7 +143,7 @@ const tools: Tool[] = [
     icon: <StorageRegular />,
     component: PartitionManager,
     category: 'Storage & Cleanup',
-    platforms: ['windows', 'linux'],
+    platforms: ['all'],
   },
   {
     id: 'network-toolkit',
