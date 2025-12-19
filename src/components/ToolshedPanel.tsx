@@ -13,6 +13,7 @@ import {
   AccordionHeader,
   AccordionItem,
   AccordionPanel,
+  Badge,
 } from '@fluentui/react-components';
 import {
   BroomRegular,
@@ -23,12 +24,14 @@ import {
   ShieldRegular,
   SearchRegular,
   ChevronDownRegular,
+  StorageRegular,
 } from '@fluentui/react-icons';
 import { CleanerPanel } from './CleanerPanel';
 import { DiskManager } from './tools/DiskManager';
 import { NetworkToolkit } from './tools/NetworkToolkit';
 import { SystemAdmin } from './tools/SystemAdmin';
 import { SecurityMonitor } from './tools/SecurityMonitor';
+import { PartitionManager } from './tools/PartitionManager';
 
 const useStyles = makeStyles({
   container: {
@@ -90,12 +93,19 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground3,
   },
+  platformBadges: {
+    display: 'flex',
+    ...shorthands.gap(tokens.spacingHorizontalXS),
+    marginTop: tokens.spacingVerticalXS,
+  },
   fullView: {
     height: '100%',
     display: 'flex',
     flexDirection: 'column',
   },
 });
+
+type Platform = 'windows' | 'linux' | 'macos' | 'all';
 
 interface Tool {
   id: string;
@@ -104,6 +114,7 @@ interface Tool {
   icon: React.ReactElement;
   component: React.ComponentType;
   category: string;
+  platforms?: Platform[];
 }
 
 const tools: Tool[] = [
@@ -114,6 +125,7 @@ const tools: Tool[] = [
     icon: <BroomRegular />,
     component: CleanerPanel,
     category: 'Storage & Cleanup',
+    platforms: ['all'],
   },
   {
     id: 'disk-manager',
@@ -122,6 +134,16 @@ const tools: Tool[] = [
     icon: <HardDriveRegular />,
     component: DiskManager,
     category: 'Storage & Cleanup',
+    platforms: ['all'],
+  },
+  {
+    id: 'partition-manager',
+    name: 'Partition Manager',
+    description: 'View and resize disk partitions safely without data loss',
+    icon: <StorageRegular />,
+    component: PartitionManager,
+    category: 'Storage & Cleanup',
+    platforms: ['windows', 'linux'],
   },
   {
     id: 'network-toolkit',
@@ -130,6 +152,7 @@ const tools: Tool[] = [
     icon: <Wifi1Regular />,
     component: NetworkToolkit,
     category: 'Network & Connectivity',
+    platforms: ['all'],
   },
   {
     id: 'system-admin',
@@ -138,6 +161,7 @@ const tools: Tool[] = [
     icon: <SettingsRegular />,
     component: SystemAdmin,
     category: 'System & Administration',
+    platforms: ['windows', 'linux'],
   },
   {
     id: 'security-monitor',
@@ -146,8 +170,35 @@ const tools: Tool[] = [
     icon: <ShieldRegular />,
     component: SecurityMonitor,
     category: 'Security & Monitoring',
+    platforms: ['windows', 'linux'],
   },
 ];
+
+const PlatformBadge = ({ platform }: { platform: Platform }) => {
+  const colors = {
+    windows: { appearance: 'filled' as const, color: 'informative' as const },
+    linux: { appearance: 'filled' as const, color: 'success' as const },
+    macos: { appearance: 'filled' as const, color: 'subtle' as const },
+    all: { appearance: 'filled' as const, color: 'brand' as const },
+  };
+
+  const labels = {
+    windows: 'Windows',
+    linux: 'Linux',
+    macos: 'macOS',
+    all: 'Cross-platform',
+  };
+
+  return (
+    <Badge
+      size="small"
+      appearance={colors[platform].appearance}
+      color={colors[platform].color}
+    >
+      {labels[platform]}
+    </Badge>
+  );
+};
 
 export default function ToolshedPanel() {
   const styles = useStyles();
@@ -269,6 +320,13 @@ export default function ToolshedPanel() {
                         <Text className={styles.toolDescription}>
                           {tool.description}
                         </Text>
+                        {tool.platforms && tool.platforms.length > 0 && (
+                          <div className={styles.platformBadges}>
+                            {tool.platforms.map((platform) => (
+                              <PlatformBadge key={platform} platform={platform} />
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </Card>
                   ))}

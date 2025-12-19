@@ -46,3 +46,19 @@ fs_extra = "1.3"
 # MCP (Model Context Protocol) - Native Rust implementation
 rmcp = { version = "0.8.0", features = ["server"] }
 schemars = "0.8"
+
+# Partition Management
+gptman = "1.0"  # GPT partition table parsing
+mbrman = "0.5"  # MBR partition table parsing
+thiserror = "2.0"  # Error handling
+
+# Windows-specific dependencies
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_Storage_FileSystem",
+    "Win32_System_Ioctl",
+    "Win32_System_WindowsProgramming",
+    "Win32_System_Com",
+] }
+wmi = "0.14"  # Windows Management Instrumentation

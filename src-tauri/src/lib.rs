@@ -6,6 +6,8 @@ mod cleaner;
 mod mcp;
 mod mcp_commands_native; // Native Rust MCP implementation (replaces subprocess)
 mod system_tools;
+mod partition;
+mod partition_commands;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -56,7 +58,14 @@ pub fn run() {
         system_tools::get_process_list,
         system_tools::kill_process,
         system_tools::get_security_logs,
-        system_tools::get_open_ports
+        system_tools::get_open_ports,
+        // Partition Management
+        partition_commands::get_disks,
+        partition_commands::get_partitions,
+        partition_commands::get_partition_info,
+        partition_commands::validate_expand_partition,
+        partition_commands::validate_shrink_partition,
+        partition_commands::expand_partition
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
