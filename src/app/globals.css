@@ -1,4 +1,5 @@
 @import "tailwindcss";
+/* @import "slider-fix.css"; */
 
 :root {
   --background: #ffffff;
@@ -23,4 +24,24 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Fluent UI Slider visibility fix - dashed rail style */
+.fui-Slider__rail {
+  background-color: transparent !important;
+  border-bottom: 2px dashed var(--colorNeutralStroke1) !important;
+  height: 2px !important;
+}
+
+.fui-Slider__track {
+  background-color: var(--colorBrandBackground) !important;
+  height: 4px !important;
+}
+
+.fui-Slider__thumb {
+  background-color: var(--colorBrandBackground) !important;
+  width: 20px !important;
+  height: 20px !important;
+  border: 3px solid var(--colorNeutralBackground1) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
 }

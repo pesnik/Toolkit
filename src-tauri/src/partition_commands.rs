@@ -85,6 +85,42 @@ pub async fn expand_partition(
     Ok(())
 }
 
+/// Shrink a partition to the specified size
+#[command]
+pub async fn shrink_partition(
+    app: AppHandle,
+    partition_id: String,
+    target_size: u64,
+) -> Result<(), String> {
+    // Emit progress: Validating
+    let _ = app.emit("resize-progress", ResizeProgress::validating("Starting validation..."));
+
+    // Get partition info
+    let partition = partition::get_partition_info(&partition_id)
+        .map_err(|e| e.to_string())?;
+
+    // Emit progress: Checking filesystem
+    let _ = app.emit("resize-progress", ResizeProgress::checking_filesystem(
+        "Checking filesystem integrity..."
+    ));
+
+    // Emit progress: Shrinking
+    let _ = app.emit("resize-progress", ResizeProgress::resizing_filesystem(
+        0.0,
+        format!("Shrinking partition {} to {}...", partition.device_path, format_size(target_size))
+    ));
+
+    // Perform shrink
+    partition::shrink::shrink_partition(&partition, target_size)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    // Emit progress: Complete
+    let _ = app.emit("resize-progress", ResizeProgress::complete("Partition shrunk successfully!"));
+
+    Ok(())
+}
+
 /// Format bytes to human-readable size
 fn format_size(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];

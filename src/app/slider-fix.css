@@ -1,0 +1,23 @@
+/* Add this to your global CSS file (e.g., app/globals.css or similar) */
+
+/* Force Slider rail to be visible */
+.fui-Slider__rail {
+    background-color: var(--colorNeutralStroke1) !important;
+    height: 6px !important;
+    border-radius: 3px !important;
+}
+
+/* Make slider track visible */
+.fui-Slider__track {
+    background-color: var(--colorBrandBackground) !important;
+    height: 6px !important;
+}
+
+/* Style the thumb */
+.fui-Slider__thumb {
+    background-color: var(--colorBrandBackground) !important;
+    width: 20px !important;
+    height: 20px !important;
+    border: 3px solid var(--colorNeutralBackground1) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}

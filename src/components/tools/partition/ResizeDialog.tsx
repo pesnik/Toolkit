@@ -20,6 +20,8 @@ import {
 } from '@fluentui/react-components';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
+import { BackupVerificationDialog } from './BackupVerificationDialog';
+import { ConfirmationDialog } from './ConfirmationDialog';
 
 interface PartitionInfo {
   id: string;
@@ -49,7 +51,7 @@ interface ValidationResult {
 
 interface ResizeProgress {
   phase: 'Validating' | 'CheckingFilesystem' | 'CreatingBackup' | 'ResizingFilesystem' |
-         'UpdatingPartitionTable' | 'ExpandingFilesystem' | 'Verifying' | 'Complete' | 'Error';
+  'UpdatingPartitionTable' | 'ExpandingFilesystem' | 'Verifying' | 'Complete' | 'Error';
   percent: number;
   message: string;
   can_cancel: boolean;
@@ -87,6 +89,23 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalM,
     padding: tokens.spacingVerticalL,
   },
+  slider: {
+    width: '100%',
+    '& .fui-Slider__rail': {
+      backgroundColor: tokens.colorNeutralBackground5,
+      height: '4px',
+    },
+    '& .fui-Slider__thumb': {
+      backgroundColor: tokens.colorBrandBackground,
+      width: '16px',
+      height: '16px',
+      border: `2px solid ${tokens.colorNeutralBackground1}`,
+    },
+    '& .fui-Slider__track': {
+      backgroundColor: tokens.colorBrandBackground,
+      height: '4px',
+    },
+  },
 });
 
 interface ResizeDialogProps {
@@ -106,10 +125,17 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess }: 
   const [isValidating, setIsValidating] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [progress, setProgress] = useState<ResizeProgress | null>(null);
+  const [showBackupDialog, setShowBackupDialog] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
-  const minSizeGB = partition.used_space ? (partition.used_space / (1024 ** 3)) : 0;
+  // Calculate min/max in GB for slider
+  const minSizeGB = partition.used_space
+    ? Math.ceil((partition.used_space * 1.2) / (1024 ** 3)) // 20% buffer above used space
+    : 1; // Minimum 1GB
   const currentSizeGB = partition.total_size / (1024 ** 3);
-  const maxSizeGB = validation?.maximum_size ? (validation.maximum_size / (1024 ** 3)) : currentSizeGB;
+  const maxSizeGB = validation?.maximum_size
+    ? (validation.maximum_size / (1024 ** 3))
+    : currentSizeGB * 2; // Default to 2x current if no validation yet
 
   useEffect(() => {
     if (open) {
@@ -147,13 +173,13 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess }: 
 
       const result = mode === 'expand'
         ? await invoke<ValidationResult>('validate_expand_partition', {
-            partitionId: partition.id,
-            targetSize: sizeInBytes,
-          })
+          partitionId: partition.id,
+          targetSize: sizeInBytes,
+        })
         : await invoke<ValidationResult>('validate_shrink_partition', {
-            partitionId: partition.id,
-            targetSize: sizeInBytes,
-          });
+          partitionId: partition.id,
+          targetSize: sizeInBytes,
+        });
 
       setValidation(result);
     } catch (error) {
@@ -176,6 +202,29 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess }: 
   const handleResize = async () => {
     if (!validation?.is_valid) return;
 
+    // For shrink operations, show backup verification first
+    if (mode === 'shrink') {
+      setShowBackupDialog(true);
+      return;
+    }
+
+    // For expand, proceed directly
+    await executeResize();
+  };
+
+  const handleBackupVerified = () => {
+    setShowBackupDialog(false);
+    setShowConfirmDialog(true);
+  };
+
+  const handleFinalConfirm = async () => {
+    setShowConfirmDialog(false);
+    await executeResize();
+  };
+
+  const executeResize = async () => {
+    if (!validation?.is_valid) return;
+
     setIsResizing(true);
     try {
       if (mode === 'expand') {
@@ -184,8 +233,10 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess }: 
           targetSize,
         });
       } else {
-        // Shrink not yet implemented
-        throw new Error('Shrink operation not yet implemented');
+        await invoke('shrink_partition', {
+          partitionId: partition.id,
+          targetSize,
+        });
       }
     } catch (error) {
       console.error('Resize error:', error);
@@ -287,9 +338,8 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess }: 
                 <Button
                   appearance={mode === 'shrink' ? 'primary' : 'secondary'}
                   onClick={() => setMode('shrink')}
-                  disabled
                 >
-                  Shrink (Coming Soon)
+                  Shrink
                 </Button>
               </div>
             </Field>
@@ -297,7 +347,7 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess }: 
             {/* Size Selector */}
             <div className={styles.sizeSelector}>
               <Field label="New Size (GB)">
-                <Slider
+                <Slider className={styles.slider} style={{ backgroundColor: "transparent" }}
                   min={minSizeGB}
                   max={maxSizeGB > currentSizeGB ? maxSizeGB : currentSizeGB * 1.5}
                   value={parseFloat(targetSizeGB)}
@@ -361,5 +411,34 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess }: 
         </DialogBody>
       </DialogSurface>
     </Dialog>
+  );
+}
+
+// Render safety dialogs outside main dialog
+function ResizeDialogWrapper(props: ResizeDialogProps) {
+  const [showBackupDialog, setShowBackupDialog] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  return (
+    <>
+      <ResizeDialog {...props} />
+      <BackupVerificationDialog
+        open={showBackupDialog}
+        partitionName={props.partition.label || `Partition ${props.partition.number}`}
+        onConfirm={() => {
+          setShowBackupDialog(false);
+          setShowConfirmDialog(true);
+        }}
+        onCancel={() => setShowBackupDialog(false)}
+      />
+      <ConfirmationDialog
+        open={showConfirmDialog}
+        partitionName={props.partition.label || `Partition ${props.partition.number}`}
+        currentSize={(props.partition.total_size / (1024 ** 3)).toFixed(2)}
+        targetSize="0"
+        onConfirm={() => setShowConfirmDialog(false)}
+        onCancel={() => setShowConfirmDialog(false)}
+      />
+    </>
   );
 }
