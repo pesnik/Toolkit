@@ -444,9 +444,13 @@ pub mod macos {
                 // Extract disk identifier (e.g., "disk0" from "/dev/disk0 (internal, physical):")
                 if let Some(disk_part) = line.split_whitespace().next() {
                     if let Some(disk_id) = disk_part.strip_prefix("/dev/") {
-                        // Only add if it doesn't contain 's' (not a partition like disk0s1)
-                        if !disk_id.contains('s') {
-                            disk_ids.push(disk_id.to_string());
+                        // Only add if it doesn't contain 's' after the 'disk' prefix (not a partition like disk0s1)
+                        // disk0 -> ok
+                        // disk0s1 -> skip
+                        if let Some(rest) = disk_id.strip_prefix("disk") {
+                            if !rest.contains('s') {
+                                disk_ids.push(disk_id.to_string());
+                            }
                         }
                     }
                 }
