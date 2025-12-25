@@ -130,8 +130,16 @@ export const SpaceReallocationWizard: React.FC<SpaceReallocationWizardProps> = (
     if (step.action_type === 'AppAssistedManual') {
       // App guides but user confirms
       if (step.title.toLowerCase().includes('delete')) {
-        // Would need to implement delete partition command
-        console.log('Delete step - not yet implemented');
+        // Execute delete partition command
+        // The plan's source_partitions contains the partitions to delete
+        for (const source of plan!.source_partitions) {
+          if (source.action === 'Delete' || source.action === 'DeleteAndRecreate') {
+            console.log(`Deleting partition: ${source.partition_id}`);
+            await invoke('delete_partition', {
+              partitionId: source.partition_id,
+            });
+          }
+        }
       }
     }
   };

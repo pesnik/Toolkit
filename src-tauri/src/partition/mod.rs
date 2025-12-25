@@ -10,6 +10,7 @@ pub mod resize;
 pub mod move_partition;
 pub mod reallocation_wizard;
 pub mod mount;
+pub mod delete;
 
 // Re-export commonly used types
 pub use types::*;
@@ -18,3 +19,4 @@ pub use resize::*;
 pub use move_partition::*;
 pub use reallocation_wizard::*;
 pub use mount::*;
+pub use delete::*;

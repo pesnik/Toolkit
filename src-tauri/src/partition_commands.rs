@@ -166,6 +166,27 @@ pub async fn mount_partition(partition_id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Validate that a partition can be safely deleted
+#[command]
+pub async fn validate_delete_partition(partition_id: String) -> Result<Vec<String>, String> {
+    let partition = partition::get_partition_info(&partition_id)
+        .map_err(|e| e.to_string())?;
+
+    partition::validate_delete(&partition)
+        .map_err(|e| e.to_string())
+}
+
+/// Delete a partition
+/// WARNING: This destroys all data on the partition!
+#[command]
+pub async fn delete_partition(partition_id: String) -> Result<(), String> {
+    let partition = partition::get_partition_info(&partition_id)
+        .map_err(|e| e.to_string())?;
+
+    partition::delete_partition(&partition)
+        .map_err(|e| e.to_string())
+}
+
 /// Format bytes to human-readable size
 fn format_size(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
