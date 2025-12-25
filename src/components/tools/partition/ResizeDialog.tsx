@@ -268,6 +268,7 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess, on
 
   if (isResizing && progress) {
     return (
+      <>
       <Dialog open={open} onOpenChange={(_, data) => !data.open && !isResizing && onClose()}>
         <DialogSurface>
           <DialogBody>
@@ -301,10 +302,13 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess, on
           </DialogBody>
         </DialogSurface>
       </Dialog>
+      {/* Note: Backup/Confirmation dialogs don't show during resize progress */}
+      </>
     );
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={(_, data) => !data.open && onClose()}>
       <DialogSurface>
         <DialogBody>
@@ -442,34 +446,24 @@ export function ResizeDialog({ partition, diskInfo, open, onClose, onSuccess, on
         </DialogBody>
       </DialogSurface>
     </Dialog>
-  );
-}
 
-// Render safety dialogs outside main dialog
-function ResizeDialogWrapper(props: ResizeDialogProps) {
-  const [showBackupDialog, setShowBackupDialog] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    {/* Backup Verification Dialog for Shrink Operations */}
+    <BackupVerificationDialog
+      open={showBackupDialog}
+      partitionName={partition.label || `Partition ${partition.number}`}
+      onConfirm={handleBackupVerified}
+      onCancel={() => setShowBackupDialog(false)}
+    />
 
-  return (
-    <>
-      <ResizeDialog {...props} />
-      <BackupVerificationDialog
-        open={showBackupDialog}
-        partitionName={props.partition.label || `Partition ${props.partition.number}`}
-        onConfirm={() => {
-          setShowBackupDialog(false);
-          setShowConfirmDialog(true);
-        }}
-        onCancel={() => setShowBackupDialog(false)}
-      />
-      <ConfirmationDialog
-        open={showConfirmDialog}
-        partitionName={props.partition.label || `Partition ${props.partition.number}`}
-        currentSize={(props.partition.total_size / (1024 ** 3)).toFixed(2)}
-        targetSize="0"
-        onConfirm={() => setShowConfirmDialog(false)}
-        onCancel={() => setShowConfirmDialog(false)}
-      />
+    {/* Final Confirmation Dialog */}
+    <ConfirmationDialog
+      open={showConfirmDialog}
+      partitionName={partition.label || `Partition ${partition.number}`}
+      currentSize={(partition.total_size / (1024 ** 3)).toFixed(2)}
+      targetSize={targetSizeGB}
+      onConfirm={handleFinalConfirm}
+      onCancel={() => setShowConfirmDialog(false)}
+    />
     </>
   );
 }
