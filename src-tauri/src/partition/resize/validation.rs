@@ -215,7 +215,7 @@ fn find_next_partition<'a>(disk: &'a DiskInfo, current: &PartitionInfo) -> Optio
 
     disk.partitions
         .iter()
-        .filter(|p| p.start_offset > current_end)
+        .filter(|p| p.start_offset >= current_end)
         .min_by_key(|p| p.start_offset)
 }
 
