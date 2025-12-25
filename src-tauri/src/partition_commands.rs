@@ -1,6 +1,6 @@
 // Tauri commands for partition management
 
-use crate::partition::{self, DiskInfo, PartitionInfo, ValidationResult, ResizeProgress};
+use crate::partition::{self, DiskInfo, PartitionInfo, ValidationResult, ResizeProgress, ReallocationPlan};
 use tauri::{command, AppHandle, Emitter};
 
 /// Get all disks available on the system
@@ -119,6 +119,31 @@ pub async fn shrink_partition(
     let _ = app.emit("resize-progress", ResizeProgress::complete("Partition shrunk successfully!"));
 
     Ok(())
+}
+
+/// Create a space reallocation plan
+/// This analyzes how to give more space to a partition by shrinking/deleting others
+#[command]
+pub async fn create_space_reallocation_plan(
+    target_partition_id: String,
+    desired_additional_space: u64,
+) -> Result<ReallocationPlan, String> {
+    // Get all disks
+    let disks = partition::get_all_disks().map_err(|e| e.to_string())?;
+
+    // Find the disk containing the target partition
+    let disk = disks
+        .iter()
+        .find(|d| d.partitions.iter().any(|p| p.id == target_partition_id))
+        .ok_or_else(|| "Disk not found for partition".to_string())?;
+
+    // Create reallocation plan
+    partition::reallocation_wizard::create_reallocation_plan(
+        disk,
+        &target_partition_id,
+        desired_additional_space,
+    )
+    .map_err(|e| e.to_string())
 }
 
 /// Format bytes to human-readable size

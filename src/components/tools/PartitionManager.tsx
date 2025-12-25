@@ -20,9 +20,12 @@ import {
   HardDriveRegular,
   ArrowSyncRegular,
   ResizeRegular,
+  ArrowSwap24Regular,
 } from '@fluentui/react-icons';
 import { invoke } from '@tauri-apps/api/core';
 import { ResizeDialog } from './partition/ResizeDialog';
+import { SpaceReallocationWizard } from './partition/SpaceReallocationWizard';
+import { SpaceInputDialog } from './partition/SpaceInputDialog';
 
 const useStyles = makeStyles({
   container: {
@@ -128,6 +131,9 @@ export function PartitionManager() {
   const [error, setError] = useState<string>('');
   const [resizeDialogOpen, setResizeDialogOpen] = useState(false);
   const [selectedPartition, setSelectedPartition] = useState<PartitionInfo | null>(null);
+  const [inputDialogOpen, setInputDialogOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardDesiredSpace, setWizardDesiredSpace] = useState<number>(0);
 
   const loadDisks = async () => {
     setLoading(true);
@@ -154,8 +160,25 @@ export function PartitionManager() {
     setResizeDialogOpen(true);
   };
 
+  const handleReallocateSpace = (partition: PartitionInfo) => {
+    setSelectedPartition(partition);
+    setInputDialogOpen(true);
+  };
+
+  const handleSpaceInputConfirm = (spaceGB: number) => {
+    setInputDialogOpen(false);
+    setWizardDesiredSpace(spaceGB * 1024 * 1024 * 1024); // Convert GB to bytes
+    setWizardOpen(true);
+  };
+
   const handleResizeSuccess = () => {
     loadDisks(); // Reload disk data after successful resize
+  };
+
+  const handleWizardClose = () => {
+    setWizardOpen(false);
+    setSelectedPartition(null);
+    loadDisks();
   };
 
   if (loading) {
@@ -273,14 +296,24 @@ export function PartitionManager() {
                       <TableCell>{partition.mount_point || '-'}</TableCell>
                       <TableCell>{partition.is_mounted ? 'Mounted' : 'Not Mounted'}</TableCell>
                       <TableCell>
-                        <Button
-                          size="small"
-                          appearance="subtle"
-                          icon={<ResizeRegular />}
-                          onClick={() => handleResizePartition(partition)}
-                        >
-                          Resize
-                        </Button>
+                        <div style={{ display: 'flex', gap: '8px' }}>
+                          <Button
+                            size="small"
+                            appearance="subtle"
+                            icon={<ResizeRegular />}
+                            onClick={() => handleResizePartition(partition)}
+                          >
+                            Resize
+                          </Button>
+                          <Button
+                            size="small"
+                            appearance="subtle"
+                            icon={<ArrowSwap24Regular />}
+                            onClick={() => handleReallocateSpace(partition)}
+                          >
+                            Reallocate
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -308,6 +341,29 @@ export function PartitionManager() {
             setSelectedPartition(null);
           }}
           onSuccess={handleResizeSuccess}
+        />
+      )}
+
+      {/* Space Input Dialog */}
+      {selectedPartition && (
+        <SpaceInputDialog
+          open={inputDialogOpen}
+          onClose={() => {
+            setInputDialogOpen(false);
+            setSelectedPartition(null);
+          }}
+          onConfirm={handleSpaceInputConfirm}
+          partitionName={selectedPartition.device_path}
+        />
+      )}
+
+      {/* Space Reallocation Wizard */}
+      {selectedPartition && (
+        <SpaceReallocationWizard
+          open={wizardOpen}
+          onClose={handleWizardClose}
+          partition={selectedPartition}
+          desiredSpace={wizardDesiredSpace}
         />
       )}
     </div>

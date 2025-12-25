@@ -1,0 +1,208 @@
+.dialog {
+  min-width: 600px;
+  max-width: 800px;
+  max-height: 90vh;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.summary {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  background-color: var(--colorNeutralBackground2);
+  border-radius: 8px;
+}
+
+.spinnerContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px;
+}
+
+.warningsSection {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.summaryCard {
+  padding: 16px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px 16px;
+  margin-top: 12px;
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sectionTitle {
+  margin-bottom: 4px;
+}
+
+.partitionCard {
+  padding: 12px;
+  border-left: 3px solid var(--colorPaletteRedBorder1);
+}
+
+.partitionInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.iconDelete {
+  color: var(--colorPaletteRedForeground1);
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.stepCard {
+  padding: 12px;
+  transition: background-color 0.2s;
+}
+
+.stepCard:hover {
+  background-color: var(--colorNeutralBackground2Hover);
+}
+
+.stepHeader {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.stepNumber {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--colorBrandBackground);
+  color: white;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.stepContent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.stepMeta {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.manualBadge {
+  padding: 2px 8px;
+  background-color: var(--colorPaletteYellowBackground2);
+  color: var(--colorPaletteYellowForeground2);
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.automatedBadge {
+  padding: 2px 8px;
+  background-color: var(--colorPaletteGreenBackground2);
+  color: var(--colorPaletteGreenForeground2);
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.assistedBadge {
+  padding: 2px 8px;
+  background-color: var(--colorPaletteBlueBorder1);
+  color: var(--colorPaletteBlueForeground1);
+  border-radius: 4px;
+  font-weight: 600;
+}
+
+.executingContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  align-items: center;
+  text-align: center;
+}
+
+.stepsProgress {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.stepProgressItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 4px;
+  transition: all 0.3s;
+}
+
+.stepProgressItem.completed {
+  background-color: var(--colorPaletteGreenBackground2);
+  color: var(--colorPaletteGreenForeground2);
+}
+
+.stepProgressItem.current {
+  background-color: var(--colorBrandBackground2);
+  color: var(--colorBrandForeground2);
+  font-weight: 600;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.stepProgressItem.pending {
+  opacity: 0.5;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.checkIcon {
+  color: var(--colorPaletteGreenForeground1);
+  font-size: 20px;
+}
+
+.successContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 32px;
+  text-align: center;
+}
+
+.successIcon {
+  color: var(--colorPaletteGreenForeground1);
+  font-size: 64px;
+}
