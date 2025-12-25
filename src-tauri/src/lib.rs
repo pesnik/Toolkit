@@ -40,7 +40,9 @@ pub fn run() {
         ai_commands::check_provider_availability,
         ai_commands::download_model,
         commands::scan_junk,
+        commands::scan_junk_with_options,
         commands::clean_junk,
+        commands::clean_junk_with_options,
         mcp_commands_native::initialize_mcp,
         mcp_commands_native::get_mcp_tools,
         mcp_commands_native::execute_mcp_tool,
@@ -65,7 +67,8 @@ pub fn run() {
         partition_commands::get_partition_info,
         partition_commands::validate_expand_partition,
         partition_commands::validate_shrink_partition,
-        partition_commands::expand_partition
+        partition_commands::expand_partition,
+        partition_commands::shrink_partition
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

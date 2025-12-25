@@ -304,6 +304,15 @@ pub async fn scan_junk() -> Result<Vec<JunkCategory>, String> {
 }
 
 #[command]
+pub async fn scan_junk_with_options(options: cleaner::CleaningOptions) -> Result<Vec<JunkCategory>, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        cleaner::scan_junk_items_with_options(options)
+    }).await.map_err(|e| e.to_string())?;
+    
+    Ok(result)
+}
+
+#[command]
 pub async fn clean_junk(paths: Vec<String>) -> Result<(), String> {
     let result = tauri::async_runtime::spawn_blocking(move || {
         cleaner::delete_junk_items(paths)
@@ -313,5 +322,22 @@ pub async fn clean_junk(paths: Vec<String>) -> Result<(), String> {
     clear_cache();
     
     Ok(())
+}
+
+#[command]
+pub async fn clean_junk_with_options(
+    paths: Vec<String>,
+    options: cleaner::CleaningOptions,
+) -> Result<cleaner::DeletionResult, String> {
+    let result = tauri::async_runtime::spawn_blocking(move || {
+        cleaner::delete_junk_items_with_options(paths, options)
+    }).await.map_err(|e| e.to_string())??;
+    
+    // Invalidate main scan cache if not dry run
+    if !result.errors.is_empty() || result.deleted_count > 0 {
+        clear_cache();
+    }
+    
+    Ok(result)
 }
 

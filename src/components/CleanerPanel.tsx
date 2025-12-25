@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
     makeStyles,
     shorthands,
+    tokens,
     Button,
     Text,
     Subtitle2,
@@ -39,8 +40,8 @@ const useStyles = makeStyles({
         height: '100%',
         ...shorthands.gap('16px'),
         ...shorthands.padding('20px'),
-        backgroundColor: '#1a1a1a', // Slightly darker background for contrast
-        color: 'white',
+        backgroundColor: tokens.colorNeutralBackground1,
+        color: tokens.colorNeutralForeground1,
     },
     header: {
         display: 'flex',
@@ -53,14 +54,14 @@ const useStyles = makeStyles({
         alignItems: 'center',
         justifyContent: 'center',
         ...shorthands.padding('24px'),
-        backgroundColor: '#292929',
+        backgroundColor: tokens.colorNeutralBackground2,
         ...shorthands.borderRadius('8px'),
-        ...shorthands.border('1px', 'solid', '#333'),
+        ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke1),
     },
     listContainer: {
         flexGrow: 1,
         overflowY: 'auto',
-        ...shorthands.border('1px', 'solid', '#333'),
+        ...shorthands.border('1px', 'solid', tokens.colorNeutralStroke1),
         ...shorthands.borderRadius('8px'),
         ...shorthands.padding('10px'),
     },
@@ -76,7 +77,7 @@ const useStyles = makeStyles({
         justifyContent: 'space-between',
         ...shorthands.padding('8px', '16px'),
         ':hover': {
-            backgroundColor: '#333',
+            backgroundColor: tokens.colorNeutralBackground1Hover,
         },
     },
 });
@@ -86,6 +87,7 @@ export const CleanerPanel = () => {
     const [categories, setCategories] = useState<JunkCategory[]>([]);
     const [loading, setLoading] = useState(false);
     const [scanning, setScanning] = useState(false); // Visual state for scanning
+    const [deleting, setDeleting] = useState(false); // Visual state for deleting
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [cleanDialogOpen, setCleanDialogOpen] = useState(false);
     const [errorDialogOpen, setErrorDialogOpen] = useState(false);
@@ -131,10 +133,14 @@ export const CleanerPanel = () => {
     const handleClean = async () => {
         setCleanDialogOpen(false);
         setLoading(true);
+        setDeleting(true);
         setCleaningErrors([]);
 
         try {
             await invoke('clean_junk', { paths: Array.from(selectedItems) });
+
+            // Small delay to show completion state
+            await new Promise(r => setTimeout(r, 500));
         } catch (e) {
             // Parse the error string into an array of individual errors
             const errorMessage = String(e);
@@ -142,6 +148,7 @@ export const CleanerPanel = () => {
             setCleaningErrors(errorLines);
             setErrorDialogOpen(true);
         } finally {
+            setDeleting(false);
             // Always re-scan to show updated state, even if there were errors
             // This ensures the UI reflects what was actually cleaned
             await handleScan();
@@ -195,7 +202,15 @@ export const CleanerPanel = () => {
 
             {/* Summary / Hero Section */}
             <div className={styles.summaryCard}>
-                {scanning ? (
+                {deleting ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                        <DeleteRegular style={{ fontSize: '48px', color: '#d13438' }} />
+                        <Text size={500}>Deleting {selectedItems.size} items...</Text>
+                        <Text size={300} style={{ color: '#aaa' }}>Freeing up {formatSize(totalSelectedSize)}</Text>
+                        <ProgressBar style={{ width: '200px' }} />
+                        <Text size={200} style={{ color: '#aaa', marginTop: '5px' }}>Please wait, this may take a moment</Text>
+                    </div>
+                ) : scanning ? (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
                         <StethoscopeRegular style={{ fontSize: '48px', color: '#0078d4' }} />
                         <Text size={500}>Scanning system for junk...</Text>
@@ -231,7 +246,7 @@ export const CleanerPanel = () => {
             </div>
 
             {/* Details List */}
-            {categories.length > 0 && !scanning && (
+            {categories.length > 0 && !scanning && !deleting && (
                 <div className={styles.listContainer}>
                     <Accordion multiple collapsible>
                         {categories.map((cat) => {
@@ -340,10 +355,10 @@ export const CleanerPanel = () => {
                             <div style={{
                                 maxHeight: '300px',
                                 overflowY: 'auto',
-                                backgroundColor: '#1a1a1a',
+                                backgroundColor: tokens.colorNeutralBackground2,
                                 padding: '12px',
                                 borderRadius: '4px',
-                                border: '1px solid #333',
+                                border: `1px solid ${tokens.colorNeutralStroke1}`,
                             }}>
                                 {cleaningErrors.map((error, index) => (
                                     <Text
