@@ -2,6 +2,7 @@
 // This module handles moving partitions to different disk locations
 
 use crate::partition::types::*;
+use crate::partition::resize::validation::ValidationResult;
 use anyhow::{anyhow, Result};
 use std::path::PathBuf;
 
