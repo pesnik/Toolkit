@@ -26,6 +26,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { ResizeDialog } from './partition/ResizeDialog';
 import { SpaceReallocationWizard } from './partition/SpaceReallocationWizard';
 import { SpaceInputDialog } from './partition/SpaceInputDialog';
+import { PartitionLayoutVisualizer } from './partition/PartitionLayoutVisualizer';
 
 const useStyles = makeStyles({
   container: {
@@ -134,6 +135,7 @@ export function PartitionManager() {
   const [inputDialogOpen, setInputDialogOpen] = useState(false);
   const [wizardOpen, setWizardOpen] = useState(false);
   const [wizardDesiredSpace, setWizardDesiredSpace] = useState<number>(0);
+  const [layoutVisualizerOpen, setLayoutVisualizerOpen] = useState(false);
 
   const loadDisks = async () => {
     setLoading(true);
@@ -265,13 +267,18 @@ export function PartitionManager() {
 
         {selectedDisk && selectedDisk.partitions.length > 0 && (
           <>
-            <Text
-              size={400}
-              weight="semibold"
-              style={{ marginTop: tokens.spacingVerticalL, marginBottom: tokens.spacingVerticalM }}
-            >
-              Partitions on {selectedDisk.model}
-            </Text>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: tokens.spacingVerticalL, marginBottom: tokens.spacingVerticalM }}>
+              <Text size={400} weight="semibold">
+                Partitions on {selectedDisk.model}
+              </Text>
+              <Button
+                appearance="secondary"
+                size="small"
+                onClick={() => setLayoutVisualizerOpen(true)}
+              >
+                Reorganize Partitions
+              </Button>
+            </div>
 
             <Card>
               <Table>
@@ -358,6 +365,27 @@ export function PartitionManager() {
           onClose={handleWizardClose}
           partition={selectedPartition}
           desiredSpace={wizardDesiredSpace}
+        />
+      )}
+
+      {/* Partition Layout Visualizer */}
+      {selectedDisk && (
+        <PartitionLayoutVisualizer
+          open={layoutVisualizerOpen}
+          onClose={() => setLayoutVisualizerOpen(false)}
+          diskId={selectedDisk.id}
+          partitions={selectedDisk.partitions}
+          diskSize={selectedDisk.total_size}
+          onExecuteMove={async (moveOperations) => {
+            try {
+              console.log('Executing move operations:', moveOperations);
+              // TODO: Implement actual partition moving
+              alert(`Will move ${moveOperations.length} partition(s). This feature is coming soon!`);
+              loadDisks();
+            } catch (err) {
+              alert(`Failed to move partitions: ${err}`);
+            }
+          }}
         />
       )}
     </div>
