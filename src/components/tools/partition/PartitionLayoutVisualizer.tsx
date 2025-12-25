@@ -119,9 +119,9 @@ interface PartitionLayoutVisualizerProps {
 }
 
 interface MoveOperation {
-  partitionId: string;
-  fromOffset: number;
-  toOffset: number;
+  partition_id: string;
+  from_offset: number;
+  to_offset: number;
 }
 
 export function PartitionLayoutVisualizer({
@@ -256,9 +256,9 @@ export function PartitionLayoutVisualizer({
       const proposed = proposedLayout.find(p => p.id === current.id);
       if (proposed && proposed.startOffset !== current.startOffset) {
         operations.push({
-          partitionId: current.id,
-          fromOffset: current.startOffset,
-          toOffset: proposed.startOffset,
+          partition_id: current.id,
+          from_offset: current.startOffset,
+          to_offset: proposed.startOffset,
         });
       }
     });

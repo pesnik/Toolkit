@@ -379,11 +379,13 @@ export function PartitionManager() {
           onExecuteMove={async (moveOperations) => {
             try {
               console.log('Executing move operations:', moveOperations);
-              // TODO: Implement actual partition moving
-              alert(`Will move ${moveOperations.length} partition(s). This feature is coming soon!`);
+              const instructions = await invoke<string>('execute_partition_moves', {
+                moveOperations
+              });
+              alert(instructions);
               loadDisks();
             } catch (err) {
-              alert(`Failed to move partitions: ${err}`);
+              alert(`Failed to generate move plan: ${err}`);
             }
           }}
         />

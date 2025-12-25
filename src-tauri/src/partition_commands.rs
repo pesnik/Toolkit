@@ -187,6 +187,39 @@ pub async fn delete_partition(partition_id: String) -> Result<(), String> {
         .map_err(|e| e.to_string())
 }
 
+/// Execute partition reorganization (move partitions)
+/// Returns instructions for using MiniTool to complete the operation
+#[command]
+pub async fn execute_partition_moves(
+    move_operations: Vec<partition::MoveOperation>,
+) -> Result<String, String> {
+    let mut instructions = String::from("To safely reorganize your partitions:\n\n");
+    instructions.push_str("RECOMMENDED: Use MiniTool Partition Wizard (Free)\n");
+    instructions.push_str("https://www.partitionwizard.com/\n\n");
+    instructions.push_str("Steps:\n");
+    instructions.push_str("1. Download and install MiniTool Partition Wizard\n");
+    instructions.push_str("2. Open the program and select your disk\n");
+
+    for (i, op) in move_operations.iter().enumerate() {
+        instructions.push_str(&format!(
+            "3.{} Drag partition (ID: {}) to the end of the disk\n",
+            i + 1,
+            &op.partition_id[..8.min(op.partition_id.len())]
+        ));
+    }
+
+    let est_time = move_operations.len() * 20;
+    instructions.push_str(&format!(
+        "\n4. Click 'Apply' and wait for completion ({} partition(s) to move)\n",
+        move_operations.len()
+    ));
+    instructions.push_str("5. Once complete, return to this app and click 'Manage Space' on C: to expand it\n\n");
+    instructions.push_str("⚠️ IMPORTANT: Backup your data before proceeding!\n");
+    instructions.push_str(&format!("⏱️ Estimated time: {} minutes\n", est_time));
+
+    Ok(instructions)
+}
+
 /// Format bytes to human-readable size
 fn format_size(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];

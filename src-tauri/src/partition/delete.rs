@@ -142,11 +142,7 @@ pub fn validate_delete(partition: &PartitionInfo) -> Result<Vec<String>> {
     }
 
     if partition.flags.contains(&PartitionFlag::System) {
-        warnings.push("⚠️ CRITICAL: This is a SYSTEM partition! Deleting it may make your system UNBOOTABLE!".to_string());
-    }
-
-    if partition.flags.contains(&PartitionFlag::EFI) {
-        warnings.push("⚠️ CRITICAL: This is an EFI partition! Deleting it will make your system UNBOOTABLE!".to_string());
+        warnings.push("⚠️ CRITICAL: This is a SYSTEM/EFI partition! Deleting it will make your system UNBOOTABLE!".to_string());
     }
 
     // Check if partition has data
