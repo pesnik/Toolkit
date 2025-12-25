@@ -65,25 +65,10 @@ pub fn validate_expand(
 
     let available_space = if let Some(next) = next_partition {
         // Space between this partition and the next one
-        let gap = next.start_offset.saturating_sub(partition_end);
-        eprintln!(
-            "DEBUG: Current partition ends at {}GB, next partition '{}' starts at {}GB, gap = {}GB",
-            partition_end / (1024 * 1024 * 1024),
-            next.device_path,
-            next.start_offset / (1024 * 1024 * 1024),
-            gap / (1024 * 1024 * 1024)
-        );
-        gap
+        next.start_offset.saturating_sub(partition_end)
     } else {
         // Space between this partition and end of disk
-        let gap = disk.total_size.saturating_sub(partition_end);
-        eprintln!(
-            "DEBUG: Current partition ends at {}GB, disk ends at {}GB, gap = {}GB",
-            partition_end / (1024 * 1024 * 1024),
-            disk.total_size / (1024 * 1024 * 1024),
-            gap / (1024 * 1024 * 1024)
-        );
-        gap
+        disk.total_size.saturating_sub(partition_end)
     };
 
     result.adjacent_space = available_space;
