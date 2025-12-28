@@ -35,6 +35,14 @@ pub mod windows {
             // Get partitions for this disk
             let partitions = get_partitions_for_disk(&wmi_con, &device_id, index as u32)?;
 
+            // Fix for stale WMI disk size: ensure total_size covers all partitions
+            let max_partition_end = partitions.iter()
+                .map(|p| p.start_offset + p.total_size)
+                .max()
+                .unwrap_or(0);
+            
+            let final_size = std::cmp::max(size, max_partition_end);
+
             // Determine partition table type
             let table_type = detect_partition_table_type(&device_id);
 
@@ -42,7 +50,7 @@ pub mod windows {
                 id: format!("disk-{}", index),
                 device_path: device_id.clone(),
                 model,
-                total_size: size,
+                total_size: final_size,
                 table_type,
                 partitions,
                 serial_number: serial,
