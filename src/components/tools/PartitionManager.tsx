@@ -15,6 +15,7 @@ import {
   TableHeaderCell,
   TableBody,
   TableCell,
+  mergeClasses,
 } from '@fluentui/react-components';
 import {
   HardDriveRegular,
@@ -243,7 +244,7 @@ export function PartitionManager() {
         {disks.map((disk) => (
           <Card
             key={disk.id}
-            className={`${styles.diskCard} ${selectedDisk?.id === disk.id ? styles.diskCardSelected : ''}`}
+            className={mergeClasses(styles.diskCard, selectedDisk?.id === disk.id && styles.diskCardSelected)}
             onClick={() => setSelectedDisk(disk)}
           >
             <div className={styles.diskCardContent}>
