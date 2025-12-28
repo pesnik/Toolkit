@@ -166,7 +166,7 @@ export function PartitionLayoutVisualizer({
           isUnallocated: true,
           isSystem: false,
           startOffset: currentOffset,
-          canMove: true,
+          canMove: false, // Don't allow moving empty space directly, it's confusing
         });
       }
 
@@ -196,7 +196,7 @@ export function PartitionLayoutVisualizer({
         isUnallocated: true,
         isSystem: false,
         startOffset: currentOffset,
-        canMove: true,
+        canMove: false,
       });
     }
 
@@ -206,6 +206,14 @@ export function PartitionLayoutVisualizer({
   const [currentLayout, setCurrentLayout] = useState<PartitionSegment[]>(buildLayout());
   const [proposedLayout, setProposedLayout] = useState<PartitionSegment[]>(buildLayout());
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Update layouts when partitions prop changes (e.g. data loaded)
+  React.useEffect(() => {
+    const layout = buildLayout();
+    setCurrentLayout(layout);
+    setProposedLayout(layout);
+    setHasChanges(false);
+  }, [partitions, diskSize]);
 
   const formatSize = (bytes: number): string => {
     const gb = bytes / (1024 ** 3);
