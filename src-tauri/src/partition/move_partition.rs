@@ -319,7 +319,7 @@ async fn backup_partition_data(
 
     #[cfg(target_os = "linux")]
     {
-        backup_partition_linux(partition, backup_path, progress_callback).await
+    backup_partition_linux(partition, backup_path, progress_callback).await
     }
 
     #[cfg(target_os = "macos")]
@@ -415,8 +415,28 @@ async fn backup_partition_macos(
     backup_path: &std::path::Path,
     progress_callback: &impl Fn(MoveProgress),
 ) -> Result<bool> {
-    // Use rsync on macOS (similar to Linux)
-    backup_partition_linux(partition, backup_path, progress_callback).await
+    use std::process::Command;
+
+    let mount_point = partition
+        .mount_point
+        .as_ref()
+        .ok_or_else(|| anyhow!("Partition must be mounted"))?;
+
+    progress_callback(MoveProgress::backing_up(0.0, partition.total_size, 0));
+
+    let output = Command::new("rsync")
+        .arg("-a")
+        .arg("--progress")
+        .arg(format!("{}/", mount_point))
+        .arg(backup_path)
+        .output()?;
+
+    if !output.status.success() {
+        return Err(anyhow!("rsync backup failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+
+    progress_callback(MoveProgress::backing_up(100.0, partition.total_size, partition.total_size));
+    Ok(true)
 }
 
 /// Delete a partition from the disk
@@ -668,7 +688,7 @@ async fn restore_partition_data(
 
     #[cfg(target_os = "linux")]
     {
-         restore_partition_linux(partition, backup_path, progress_callback).await
+    restore_partition_linux(partition, backup_path, progress_callback).await
     }
     
     #[cfg(target_os = "macos")]
@@ -736,7 +756,8 @@ async fn restore_partition_linux(
         .as_ref()
         .ok_or_else(|| anyhow!("Target partition must be mounted"))?;
 
-    // rsync from backup/ (trailing slash) to mount_point
+    progress_callback(MoveProgress::restoring_data(0.0, partition.total_size, 0));
+
     let output = Command::new("rsync")
         .arg("-av")
         .arg("--progress")
@@ -758,7 +779,28 @@ async fn restore_partition_macos(
     backup_path: &std::path::Path,
     progress_callback: &impl Fn(MoveProgress),
 ) -> Result<bool> {
-    restore_partition_linux(partition, backup_path, progress_callback).await
+    use std::process::Command;
+    
+    let mount_point = partition
+        .mount_point
+        .as_ref()
+        .ok_or_else(|| anyhow!("Target partition must be mounted"))?;
+
+    progress_callback(MoveProgress::restoring_data(0.0, partition.total_size, 0));
+
+    let output = Command::new("rsync")
+        .arg("-a")
+        .arg("--progress")
+        .arg(format!("{}/", backup_path.display()))
+        .arg(mount_point)
+        .output()?;
+
+    if !output.status.success() {
+        return Err(anyhow!("rsync restore failed: {}", String::from_utf8_lossy(&output.stderr)));
+    }
+
+    progress_callback(MoveProgress::restoring_data(100.0, partition.total_size, partition.total_size));
+    Ok(true)
 }
 
 /// Format bytes to human-readable string
